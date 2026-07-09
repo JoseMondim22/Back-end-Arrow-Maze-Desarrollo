@@ -1,14 +1,14 @@
-import { IUseCase } from '../../ports/use-case';
-import { IIdGenerator } from '../../ports/id-generator';
-import { IPasswordHasher } from '../../ports/password-hasher';
-import { RegisterUserCommand } from '../../commands/register-user.command';
-import { IUserRepository } from '../../../domain/user/i-user-repository';
-import { User } from '../../../domain/user/user.aggregate';
-import { UserId } from '../../../domain/user/value-objects/user-id';
-import { Email } from '../../../domain/user/value-objects/email';
-import { Password } from '../../../domain/user/value-objects/password';
-import { Username } from '../../../domain/user/value-objects/username';
-import { EmailAlreadyRegisteredError } from '../../../domain/user/errors';
+import { IUseCase } from '../ports/use-case';
+import { IIdGenerator } from '../ports/id-generator';
+import { IPasswordHasher } from '../ports/password-hasher';
+import { RegisterUserCommand } from '../commands/register-user.command';
+import { IUserRepository } from '../../domain/user/i-user-repository';
+import { User } from '../../domain/user/user.aggregate';
+import { UserId } from '../../domain/user/value-objects/user-id';
+import { Email } from '../../domain/user/value-objects/email';
+import { Password } from '../../domain/user/value-objects/password';
+import { Username } from '../../domain/user/value-objects/username';
+import { EmailAlreadyRegisteredError } from '../../domain/user/errors';
 
 export class RegisterUserUseCase implements IUseCase<RegisterUserCommand> {
   constructor(

@@ -1,4 +1,4 @@
-import { RegisterUserUseCase } from '../../src/application/use-cases/auth/register-user.use-case';
+import { RegisterUserUseCase } from '../../src/application/use-cases/register-user.use-case';
 import { RegisterUserCommand } from '../../src/application/commands/register-user.command';
 import { IIdGenerator } from '../../src/application/ports/id-generator';
 import { IPasswordHasher } from '../../src/application/ports/password-hasher';
