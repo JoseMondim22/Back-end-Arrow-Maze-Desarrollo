@@ -23,3 +23,9 @@ export class InvalidUsernameError extends DomainError {
     super(message);
   }
 }
+
+export class EmailAlreadyRegisteredError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
