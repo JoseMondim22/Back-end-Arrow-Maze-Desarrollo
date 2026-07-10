@@ -15,6 +15,7 @@ export class RegisterUserTestAPI {
   };
   private readonly passwordHasher: IPasswordHasher = {
     hash: jest.fn().mockResolvedValue(HASHED_PASSWORD),
+    verify: jest.fn().mockResolvedValue(true),
   };
   private thrownError: Error | null = null;
 

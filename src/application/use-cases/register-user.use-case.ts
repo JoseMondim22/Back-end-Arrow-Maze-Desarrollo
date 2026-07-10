@@ -1,4 +1,4 @@
-import { IUseCase } from '../ports/use-case';
+import { ICommandService } from '../ports/command-service';
 import { IIdGenerator } from '../ports/id-generator';
 import { IPasswordHasher } from '../ports/password-hasher';
 import { RegisterUserCommand } from '../commands/register-user.command';
@@ -10,7 +10,7 @@ import { Password } from '../../domain/user/value-objects/password';
 import { Username } from '../../domain/user/value-objects/username';
 import { EmailAlreadyRegisteredError } from '../../domain/user/errors';
 
-export class RegisterUserUseCase implements IUseCase<RegisterUserCommand> {
+export class RegisterUserUseCase implements ICommandService<RegisterUserCommand> {
   constructor(
     private readonly userRepository: IUserRepository,
     private readonly idGenerator: IIdGenerator,
