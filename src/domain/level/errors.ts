@@ -65,3 +65,9 @@ export class UnknownCellTypeError extends DomainError {
     super(message);
   }
 }
+
+export class LevelNotFoundError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
