@@ -11,3 +11,9 @@ export class InvalidScoreError extends DomainError {
     super(message);
   }
 }
+
+export class ImplausibleScoreError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
