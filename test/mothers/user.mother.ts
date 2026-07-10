@@ -41,6 +41,15 @@ export class UserMother {
     );
   }
 
+  static withIdAndUsername(id: string, username: string): User {
+    return User.register(
+      UserId.create(id),
+      Email.create('user@example.com'),
+      Password.fromHash('salt:hash'),
+      Username.create(username),
+    );
+  }
+
   static reconstitutedWithId(id: string): User {
     return User.reconstitute(
       UserId.create(id),
