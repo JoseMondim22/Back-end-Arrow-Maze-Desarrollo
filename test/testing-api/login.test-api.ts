@@ -16,6 +16,7 @@ export class LoginTestAPI {
   };
   private readonly tokenGenerator: ITokenGenerator = {
     generate: jest.fn().mockReturnValue(GENERATED_TOKEN),
+    verify: jest.fn(),
   };
   private result: LoginResult | null = null;
   private thrownError: Error | null = null;
