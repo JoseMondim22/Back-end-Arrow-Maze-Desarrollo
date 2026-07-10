@@ -29,3 +29,9 @@ export class EmailAlreadyRegisteredError extends DomainError {
     super(message);
   }
 }
+
+export class InvalidCredentialsError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
