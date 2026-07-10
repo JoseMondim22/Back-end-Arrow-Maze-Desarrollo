@@ -35,3 +35,9 @@ export class InvalidCredentialsError extends DomainError {
     super(message);
   }
 }
+
+export class UserNotFoundError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
