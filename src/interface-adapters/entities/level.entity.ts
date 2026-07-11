@@ -12,7 +12,7 @@ export class LevelEntity {
   @PrimaryColumn('varchar', { length: 12 })
   id!: string;
 
-  @Column('jsonb')
+  @Column('simple-json')
   boardData!: BoardData;
 
   @Column()
