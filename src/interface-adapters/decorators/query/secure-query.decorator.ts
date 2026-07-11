@@ -1,16 +1,14 @@
 import { IQueryService } from '../../../application/ports/query-service';
-import { ITokenGenerator } from '../../../application/ports/token-generator';
-import { verifyAuth } from '../shared/auth.helper';
+import { CurrentUserProvider } from '../shared/current-user.provider';
 
 export class SecureQueryDecorator<TQuery, TResult> implements IQueryService<TQuery, TResult> {
   constructor(
     private readonly decoratee: IQueryService<TQuery, TResult>,
-    private readonly tokenGenerator: ITokenGenerator,
-    private readonly token: string,
+    private readonly currentUser: CurrentUserProvider,
   ) {}
 
   async execute(query: TQuery): Promise<TResult> {
-    verifyAuth(this.tokenGenerator, this.token);
+    this.currentUser.ensureAuthenticated();
     return this.decoratee.execute(query);
   }
 }

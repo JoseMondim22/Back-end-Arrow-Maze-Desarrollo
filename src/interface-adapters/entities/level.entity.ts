@@ -1,21 +1,10 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
-
-export interface BoardNodeData {
-  id: string;
-  type: string;
-  direction?: string;
-  row: number;
-  column: number;
-}
-
-export interface BoardEdgeData {
-  from: string;
-  to: string;
-}
+import { NodeRawData } from '../dtos/input/node-raw-data.dto';
+import { EdgeRawData } from '../dtos/input/edge-raw-data.dto';
 
 export interface BoardData {
-  nodes: BoardNodeData[];
-  edges: BoardEdgeData[];
+  nodes: NodeRawData[];
+  edges: EdgeRawData[];
 }
 
 @Entity('levels')
