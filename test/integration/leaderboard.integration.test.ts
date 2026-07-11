@@ -1,4 +1,4 @@
-import { LeaderboardIntegrationTestAPI } from './testing-api/leaderboard-integration.test-api';
+import { LeaderboardIntegrationTestAPI } from '../http-testing-api/leaderboard-integration.test-api';
 
 describe('GET /leaderboard/:levelId', () => {
   const api = new LeaderboardIntegrationTestAPI();

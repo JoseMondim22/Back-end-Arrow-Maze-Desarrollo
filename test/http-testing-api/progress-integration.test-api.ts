@@ -1,12 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import supertest from 'supertest';
-import { bootstrapTestApp } from '../setup/bootstrap-test-app';
-import { RegisterDTO } from '../../../src/interface-adapters/dtos/input/register.dto';
-import { LoginDTO } from '../../../src/interface-adapters/dtos/input/login.dto';
-import { CreateLevelDTO } from '../../../src/interface-adapters/dtos/input/create-level.dto';
-import { NodeRawData } from '../../../src/interface-adapters/dtos/input/node-raw-data.dto';
-import { EdgeRawData } from '../../../src/interface-adapters/dtos/input/edge-raw-data.dto';
-import { SyncDTO } from '../../../src/interface-adapters/dtos/input/sync.dto';
+import { bootstrapTestApp } from '../http-setup/bootstrap-test-app';
+import { RegisterDTO } from '../../src/interface-adapters/dtos/input/register.dto';
+import { LoginDTO } from '../../src/interface-adapters/dtos/input/login.dto';
+import { CreateLevelDTO } from '../../src/interface-adapters/dtos/input/create-level.dto';
+import { NodeRawData } from '../../src/interface-adapters/dtos/input/node-raw-data.dto';
+import { EdgeRawData } from '../../src/interface-adapters/dtos/input/edge-raw-data.dto';
+import { SyncDTO } from '../../src/interface-adapters/dtos/input/sync.dto';
 
 const REGISTERED_EMAIL = 'progress-tester@example.com';
 const REGISTERED_PASSWORD = 'Password1';

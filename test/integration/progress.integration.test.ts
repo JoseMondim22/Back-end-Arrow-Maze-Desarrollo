@@ -1,4 +1,4 @@
-import { ProgressIntegrationTestAPI } from './testing-api/progress-integration.test-api';
+import { ProgressIntegrationTestAPI } from '../http-testing-api/progress-integration.test-api';
 
 describe('POST /progress/sync', () => {
   const api = new ProgressIntegrationTestAPI();

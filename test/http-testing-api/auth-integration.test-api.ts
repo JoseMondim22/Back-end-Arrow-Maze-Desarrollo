@@ -1,8 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import supertest from 'supertest';
-import { bootstrapTestApp } from '../setup/bootstrap-test-app';
-import { RegisterDTO } from '../../../src/interface-adapters/dtos/input/register.dto';
-import { LoginDTO } from '../../../src/interface-adapters/dtos/input/login.dto';
+import { bootstrapTestApp } from '../http-setup/bootstrap-test-app';
+import { RegisterDTO } from '../../src/interface-adapters/dtos/input/register.dto';
+import { LoginDTO } from '../../src/interface-adapters/dtos/input/login.dto';
+import { assertShape } from '../contract/shape-matcher';
 
 export class AuthIntegrationTestAPI {
   private app!: INestApplication;
@@ -42,5 +43,9 @@ export class AuthIntegrationTestAPI {
 
   thenResponseMessageShouldContain(fragment: string): void {
     expect(this.lastResponse.body.message).toContain(fragment);
+  }
+
+  thenResponseShouldMatchTokenDTOShape(): void {
+    assertShape(this.lastResponse.body, { accessToken: 'string', userId: 'string' });
   }
 }

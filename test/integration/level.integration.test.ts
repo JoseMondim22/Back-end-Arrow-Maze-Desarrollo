@@ -1,4 +1,4 @@
-import { LevelIntegrationTestAPI } from './testing-api/level-integration.test-api';
+import { LevelIntegrationTestAPI } from '../http-testing-api/level-integration.test-api';
 import { CreateLevelDTO } from '../../src/interface-adapters/dtos/input/create-level.dto';
 import { NodeRawData } from '../../src/interface-adapters/dtos/input/node-raw-data.dto';
 import { EdgeRawData } from '../../src/interface-adapters/dtos/input/edge-raw-data.dto';

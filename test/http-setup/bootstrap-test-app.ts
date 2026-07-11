@@ -1,8 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Server } from 'http';
-import { AppModule } from '../../../src/infrastructure/modules/app.module';
-import { PersistenceModule } from '../../../src/infrastructure/modules/persistence.module';
+import { AppModule } from '../../src/infrastructure/modules/app.module';
+import { PersistenceModule } from '../../src/infrastructure/modules/persistence.module';
 import { TestPersistenceModule } from './test-persistence.module';
 
 export interface TestApp {

@@ -1,4 +1,4 @@
-import { AuthIntegrationTestAPI } from './testing-api/auth-integration.test-api';
+import { AuthIntegrationTestAPI } from '../http-testing-api/auth-integration.test-api';
 import { RegisterDTO } from '../../src/interface-adapters/dtos/input/register.dto';
 import { LoginDTO } from '../../src/interface-adapters/dtos/input/login.dto';
 
