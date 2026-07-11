@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, HttpCode, HttpStatus, Inject, Param, Query, UseFilters } from '@nestjs/common';
+import { Controller, Get, Headers, HttpCode, HttpStatus, Inject, Param, UseFilters } from '@nestjs/common';
 import { GetLeaderboardQuery } from '../../application/queries/get-leaderboard.query';
 import { LeaderboardEntryResult } from '../../application/results/leaderboard-entry.result';
 import { LeaderboardEntryDTO } from '../dtos/output/leaderboard-entry.dto';
@@ -11,7 +11,7 @@ import {
   SecureQueryServiceFactory,
 } from './tokens';
 
-const DEFAULT_LIMIT = 10;
+const LEADERBOARD_TOP_ENTRIES = 20;
 
 @Controller('leaderboard')
 @UseFilters(DomainExceptionFilter)
@@ -30,14 +30,12 @@ export class LeaderboardController {
   @HttpCode(HttpStatus.OK)
   async getLeaderboard(
     @Param('levelId') levelId: string,
-    @Query('limit') limit: string | undefined,
     @Headers('authorization') authorizationHeader?: string,
   ): Promise<LeaderboardEntryDTO[]> {
     const currentUser = this.currentUserProviderFactory(extractBearerToken(authorizationHeader));
-    const parsedLimit = limit ? Number(limit) : DEFAULT_LIMIT;
 
     const entries = await this.getLeaderboardServiceFactory(currentUser).execute(
-      new GetLeaderboardQuery(levelId, parsedLimit),
+      new GetLeaderboardQuery(levelId, LEADERBOARD_TOP_ENTRIES),
     );
 
     return entries.map((entry) => new LeaderboardEntryDTO(entry.position, entry.username, entry.score));
