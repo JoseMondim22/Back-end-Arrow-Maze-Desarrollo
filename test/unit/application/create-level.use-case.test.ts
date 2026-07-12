@@ -1,8 +1,8 @@
 import { CreateLevelCommand } from '../../../src/application/commands/create-level.command';
 import {
+  DanglingChainError,
   DanglingEdgeError,
   MissingExitCellError,
-  MultipleExitCellsError,
 } from '../../../src/domain/level/errors';
 import { CreateLevelTestAPI } from '../../testing-api/create-level.test-api';
 
@@ -12,6 +12,7 @@ describe('CreateLevelUseCase', () => {
     const api = new CreateLevelTestAPI();
     const command = new CreateLevelCommand(
       [{ id: '1', type: 'exit', row: 0, column: 0 }],
+      [],
       [],
       60,
       20,
@@ -32,6 +33,7 @@ describe('CreateLevelUseCase', () => {
     const api = new CreateLevelTestAPI();
     const command = new CreateLevelCommand(
       [{ id: '1', type: 'exit', row: 0, column: 0 }],
+      [],
       [],
       60,
       20,
@@ -56,6 +58,7 @@ describe('CreateLevelUseCase', () => {
         { id: '2', type: 'exit', row: 0, column: 1 },
       ],
       [{ from: '1', to: '2' }],
+      [],
       60,
       20,
       100,
@@ -70,11 +73,61 @@ describe('CreateLevelUseCase', () => {
     api.thenSavedLevelShouldHaveNodeCount(2);
   });
 
+  it('should_save_level_with_given_chain', async () => {
+    // Arrange
+    const api = new CreateLevelTestAPI();
+    const command = new CreateLevelCommand(
+      [
+        { id: '1', type: 'empty', row: 0, column: 0 },
+        { id: '2', type: 'grid_arrow', row: 0, column: 1, direction: 'up' },
+        { id: '3', type: 'exit', row: 0, column: 2 },
+      ],
+      [],
+      [{ id: 'c1', nodeIds: ['1', '2'] }],
+      60,
+      20,
+      100,
+      1,
+      1,
+    );
+
+    // Act
+    await api.whenCreatingLevel(command);
+
+    // Assert
+    api.thenSavedLevelShouldHaveChainCount(1);
+  });
+
+  it('should_fail_when_chain_references_unknown_node', async () => {
+    // Arrange
+    const api = new CreateLevelTestAPI();
+    const command = new CreateLevelCommand(
+      [
+        { id: '1', type: 'grid_arrow', row: 0, column: 0, direction: 'up' },
+        { id: '2', type: 'exit', row: 0, column: 1 },
+      ],
+      [],
+      [{ id: 'c1', nodeIds: ['9', '1'] }],
+      60,
+      20,
+      100,
+      1,
+      1,
+    );
+
+    // Act
+    await api.whenCreatingLevel(command);
+
+    // Assert
+    api.thenShouldFailWith(DanglingChainError);
+  });
+
   it('should_fail_when_board_has_no_exit_cell', async () => {
     // Arrange
     const api = new CreateLevelTestAPI();
     const command = new CreateLevelCommand(
       [{ id: '1', type: 'wall', row: 0, column: 0 }],
+      [],
       [],
       60,
       20,
@@ -90,7 +143,7 @@ describe('CreateLevelUseCase', () => {
     api.thenShouldFailWith(MissingExitCellError);
   });
 
-  it('should_fail_when_board_has_multiple_exit_cells', async () => {
+  it('should_save_level_when_board_has_multiple_exit_cells', async () => {
     // Arrange
     const api = new CreateLevelTestAPI();
     const command = new CreateLevelCommand(
@@ -98,6 +151,7 @@ describe('CreateLevelUseCase', () => {
         { id: '1', type: 'exit', row: 0, column: 0 },
         { id: '2', type: 'exit', row: 0, column: 1 },
       ],
+      [],
       [],
       60,
       20,
@@ -110,7 +164,7 @@ describe('CreateLevelUseCase', () => {
     await api.whenCreatingLevel(command);
 
     // Assert
-    api.thenShouldFailWith(MultipleExitCellsError);
+    api.thenSavedLevelShouldHaveNodeCount(2);
   });
 
   it('should_fail_when_edge_references_unknown_node', async () => {
@@ -119,6 +173,7 @@ describe('CreateLevelUseCase', () => {
     const command = new CreateLevelCommand(
       [{ id: '1', type: 'exit', row: 0, column: 0 }],
       [{ from: '1', to: '2' }],
+      [],
       60,
       20,
       100,
@@ -138,6 +193,7 @@ describe('CreateLevelUseCase', () => {
     const api = new CreateLevelTestAPI();
     const command = new CreateLevelCommand(
       [{ id: '1', type: 'wall', row: 0, column: 0 }],
+      [],
       [],
       60,
       20,

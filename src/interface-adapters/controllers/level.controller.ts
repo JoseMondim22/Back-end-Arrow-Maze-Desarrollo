@@ -55,6 +55,7 @@ export class LevelController {
       new CreateLevelCommand(
         dto.nodes,
         dto.edges,
+        dto.chains,
         dto.timeLimit,
         dto.maxMoves,
         dto.maxPossibleScore,
@@ -65,14 +66,15 @@ export class LevelController {
   }
 
   private toLevelDTO(level: Level): LevelDTO {
-    const { nodes, edges } = BoardMapper.toRaw(level.getBoard());
+    const { nodes, edges, chains } = BoardMapper.toRaw(level.getBoard());
     const rules = level.getRules();
 
     return new LevelDTO(
       level.getId().getValue(),
-      new BoardDTO(nodes, edges),
+      new BoardDTO(nodes, edges, chains),
       rules.getTimeLimit(),
       rules.getMaxMoves(),
+      rules.getMaxPossibleScore(),
       rules.getDifficulty(),
       level.getOrder().getValue(),
     );

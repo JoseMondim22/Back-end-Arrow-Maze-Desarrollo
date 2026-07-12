@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { NodeRawData } from './node-raw-data.dto';
 import { EdgeRawData } from './edge-raw-data.dto';
+import { ChainRawData } from './chain-raw-data.dto';
 
 export class CreateLevelDTO {
   @ApiProperty({ type: [NodeRawData] })
@@ -8,6 +9,9 @@ export class CreateLevelDTO {
 
   @ApiProperty({ type: [EdgeRawData] })
   readonly edges: EdgeRawData[];
+
+  @ApiProperty({ type: [ChainRawData] })
+  readonly chains: ChainRawData[];
 
   @ApiProperty({ example: 60 })
   readonly timeLimit: number;
@@ -27,6 +31,7 @@ export class CreateLevelDTO {
   constructor(
     nodes: NodeRawData[],
     edges: EdgeRawData[],
+    chains: ChainRawData[],
     timeLimit: number,
     maxMoves: number,
     maxPossibleScore: number,
@@ -35,6 +40,7 @@ export class CreateLevelDTO {
   ) {
     this.nodes = nodes;
     this.edges = edges;
+    this.chains = chains;
     this.timeLimit = timeLimit;
     this.maxMoves = maxMoves;
     this.maxPossibleScore = maxPossibleScore;

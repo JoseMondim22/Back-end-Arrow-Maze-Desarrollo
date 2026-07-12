@@ -9,7 +9,7 @@ export class LevelMapper {
   static toDomain(entity: LevelEntity): Level {
     return Level.reconstitute(
       LevelId.create(entity.id),
-      BoardMapper.toDomain(entity.boardData.nodes, entity.boardData.edges),
+      BoardMapper.toDomain(entity.boardData.nodes, entity.boardData.edges, entity.boardData.chains),
       LevelRules.create(
         entity.timeLimit,
         entity.maxMoves,

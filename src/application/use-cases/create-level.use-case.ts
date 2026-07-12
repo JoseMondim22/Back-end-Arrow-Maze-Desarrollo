@@ -5,6 +5,8 @@ import { ILevelRepository } from '../../domain/level/i-level-repository';
 import { Level } from '../../domain/level/level.aggregate';
 import { Board } from '../../domain/level/value-objects/board';
 import { CellNode } from '../../domain/level/value-objects/cell-node';
+import { Chain } from '../../domain/level/value-objects/chain';
+import { ChainId } from '../../domain/level/value-objects/chain-id';
 import { Edge } from '../../domain/level/value-objects/edge';
 import { GridPosition } from '../../domain/level/value-objects/grid-position';
 import { LevelId } from '../../domain/level/value-objects/level-id';
@@ -32,7 +34,14 @@ export class CreateLevelUseCase implements ICommandService<CreateLevelCommand> {
       Edge.create(NodeId.create(edge.from), NodeId.create(edge.to)),
     );
 
-    const board = Board.create(nodes, edges);
+    const chains = command.chains.map((chain) =>
+      Chain.create(
+        ChainId.create(chain.id),
+        chain.nodeIds.map((nodeId) => NodeId.create(nodeId)),
+      ),
+    );
+
+    const board = Board.create(nodes, edges, chains);
     const rules = LevelRules.create(
       command.timeLimit,
       command.maxMoves,
