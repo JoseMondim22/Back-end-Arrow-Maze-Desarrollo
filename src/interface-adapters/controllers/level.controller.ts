@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Inject, Post, UseFilters } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Level } from '../../domain/level/level.aggregate';
 import { GetLevelsQuery } from '../../application/queries/get-levels.query';
 import { CreateLevelCommand } from '../../application/commands/create-level.command';
@@ -17,6 +18,8 @@ import {
   SecureQueryServiceFactory,
 } from './tokens';
 
+@ApiTags('levels')
+@ApiBearerAuth()
 @Controller('levels')
 @UseFilters(DomainExceptionFilter)
 export class LevelController {
@@ -31,6 +34,8 @@ export class LevelController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'List all levels' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Levels retrieved successfully', type: [LevelDTO] })
   async getLevels(@Headers('authorization') authorizationHeader?: string): Promise<LevelDTO[]> {
     const currentUser = this.currentUserProviderFactory(extractBearerToken(authorizationHeader));
     const levels = await this.getLevelsServiceFactory(currentUser).execute(new GetLevelsQuery());
@@ -39,6 +44,8 @@ export class LevelController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new level' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Level created successfully' })
   async createLevel(
     @Body() dto: CreateLevelDTO,
     @Headers('authorization') authorizationHeader?: string,
