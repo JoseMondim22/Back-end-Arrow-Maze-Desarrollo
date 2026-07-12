@@ -44,6 +44,7 @@ export class ProgressIntegrationTestAPI {
     const payload = new CreateLevelDTO(
       [new NodeRawData('1', 'grid_arrow', 0, 0, 'up'), new NodeRawData('2', 'exit', 0, 1)],
       [new EdgeRawData('1', '2')],
+      [],
       60,
       20,
       maxPossibleScore,

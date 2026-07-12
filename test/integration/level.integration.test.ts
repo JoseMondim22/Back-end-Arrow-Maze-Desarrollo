@@ -2,6 +2,7 @@ import { LevelIntegrationTestAPI } from '../http-testing-api/level-integration.t
 import { CreateLevelDTO } from '../../src/interface-adapters/dtos/input/create-level.dto';
 import { NodeRawData } from '../../src/interface-adapters/dtos/input/node-raw-data.dto';
 import { EdgeRawData } from '../../src/interface-adapters/dtos/input/edge-raw-data.dto';
+import { ChainRawData } from '../../src/interface-adapters/dtos/input/chain-raw-data.dto';
 
 const validLevelPayload = new CreateLevelDTO(
   [
@@ -9,6 +10,7 @@ const validLevelPayload = new CreateLevelDTO(
     new NodeRawData('2', 'exit', 0, 1),
   ],
   [new EdgeRawData('1', '2')],
+  [new ChainRawData('c1', ['1'])],
   60,
   20,
   100,
@@ -18,6 +20,7 @@ const validLevelPayload = new CreateLevelDTO(
 
 const payloadWithoutExitCell = new CreateLevelDTO(
   [new NodeRawData('1', 'grid_arrow', 0, 0, 'up')],
+  [],
   [],
   60,
   20,

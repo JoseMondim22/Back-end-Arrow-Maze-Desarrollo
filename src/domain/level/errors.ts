@@ -48,12 +48,6 @@ export class MissingExitCellError extends DomainError {
   }
 }
 
-export class MultipleExitCellsError extends DomainError {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
 export class DanglingEdgeError extends DomainError {
   constructor(message: string) {
     super(message);
@@ -61,6 +55,42 @@ export class DanglingEdgeError extends DomainError {
 }
 
 export class UnknownCellTypeError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class InvalidChainIdError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class EmptyChainError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class DuplicateChainNodeError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class DanglingChainError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class InvalidChainHeadError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class InvalidChainBodyError extends DomainError {
   constructor(message: string) {
     super(message);
   }

@@ -77,12 +77,14 @@ export class LevelIntegrationTestAPI {
       board: 'object',
       timeLimit: 'number',
       maxMoves: 'number',
+      maxPossibleScore: 'number',
       difficulty: 'number',
       order: 'number',
     });
-    assertShape(level.board, { nodes: 'object', edges: 'object' });
+    assertShape(level.board, { nodes: 'object', edges: 'object', chains: 'object' });
     expect(Array.isArray(level.board.nodes)).toBe(true);
     expect(Array.isArray(level.board.edges)).toBe(true);
+    expect(Array.isArray(level.board.chains)).toBe(true);
     assertShape(level.board.nodes[0], {
       id: 'string',
       type: 'string',
@@ -91,5 +93,7 @@ export class LevelIntegrationTestAPI {
       direction: 'string',
     });
     assertShape(level.board.edges[0], { from: 'string', to: 'string' });
+    assertShape(level.board.chains[0], { id: 'string', nodeIds: 'object' });
+    expect(Array.isArray(level.board.chains[0].nodeIds)).toBe(true);
   }
 }

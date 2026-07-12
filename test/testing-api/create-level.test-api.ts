@@ -38,6 +38,11 @@ export class CreateLevelTestAPI {
     expect(savedLevel.getBoard().getNodes()).toHaveLength(expectedCount);
   }
 
+  thenSavedLevelShouldHaveChainCount(expectedCount: number): void {
+    const savedLevel = this.levelRepository.getSavedLevels()[0];
+    expect(savedLevel.getBoard().getChains()).toHaveLength(expectedCount);
+  }
+
   thenNoLevelShouldBeSaved(): void {
     expect(this.levelRepository.getSavedLevels()).toHaveLength(0);
   }

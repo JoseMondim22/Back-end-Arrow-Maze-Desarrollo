@@ -11,10 +11,16 @@ export interface CreateLevelEdgeInput {
   to: string;
 }
 
+export interface CreateLevelChainInput {
+  id: string;
+  nodeIds: string[];
+}
+
 export class CreateLevelCommand {
   constructor(
     readonly nodes: CreateLevelNodeInput[],
     readonly edges: CreateLevelEdgeInput[],
+    readonly chains: CreateLevelChainInput[],
     readonly timeLimit: number,
     readonly maxMoves: number,
     readonly maxPossibleScore: number,

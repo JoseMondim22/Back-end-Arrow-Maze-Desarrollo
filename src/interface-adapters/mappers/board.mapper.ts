@@ -1,5 +1,7 @@
 import { Board } from '../../domain/level/value-objects/board';
 import { CellNode } from '../../domain/level/value-objects/cell-node';
+import { Chain } from '../../domain/level/value-objects/chain';
+import { ChainId } from '../../domain/level/value-objects/chain-id';
 import { Edge } from '../../domain/level/value-objects/edge';
 import { NodeId } from '../../domain/level/value-objects/node-id';
 import { GridPosition } from '../../domain/level/value-objects/grid-position';
@@ -12,9 +14,10 @@ import { CellFactory } from '../../domain/level/factories/cell.factory';
 import { UnknownCellTypeError } from '../../domain/level/errors';
 import { NodeRawData } from '../dtos/input/node-raw-data.dto';
 import { EdgeRawData } from '../dtos/input/edge-raw-data.dto';
+import { ChainRawData } from '../dtos/input/chain-raw-data.dto';
 
 export class BoardMapper {
-  static toDomain(nodes: NodeRawData[], edges: EdgeRawData[]): Board {
+  static toDomain(nodes: NodeRawData[], edges: EdgeRawData[], chains: ChainRawData[] = []): Board {
     const cellNodes = nodes.map((raw) =>
       CellNode.create(
         NodeId.create(raw.id),
@@ -23,11 +26,17 @@ export class BoardMapper {
       ),
     );
     const cellEdges = edges.map((raw) => Edge.create(NodeId.create(raw.from), NodeId.create(raw.to)));
+    const boardChains = (chains ?? []).map((raw) =>
+      Chain.create(
+        ChainId.create(raw.id),
+        raw.nodeIds.map((nodeId) => NodeId.create(nodeId)),
+      ),
+    );
 
-    return Board.create(cellNodes, cellEdges);
+    return Board.create(cellNodes, cellEdges, boardChains);
   }
 
-  static toRaw(board: Board): { nodes: NodeRawData[]; edges: EdgeRawData[] } {
+  static toRaw(board: Board): { nodes: NodeRawData[]; edges: EdgeRawData[]; chains: ChainRawData[] } {
     const nodes = board.getNodes().map((node) => {
       const position = node.getPosition() as GridPosition;
       const { type, direction } = BoardMapper.serializeCellType(node.getCellType());
@@ -38,7 +47,11 @@ export class BoardMapper {
       .getEdges()
       .map((edge) => new EdgeRawData(edge.getFrom().getValue(), edge.getTo().getValue()));
 
-    return { nodes, edges };
+    const chains = board
+      .getChains()
+      .map((chain) => new ChainRawData(chain.getId().getValue(), chain.getNodeIds().map((id) => id.getValue())));
+
+    return { nodes, edges, chains };
   }
 
   private static serializeCellType(cellType: unknown): { type: string; direction?: string } {

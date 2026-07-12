@@ -14,6 +14,9 @@ export class LevelDTO {
   @ApiProperty({ example: 10 })
   readonly maxMoves: number;
 
+  @ApiProperty({ example: 1000 })
+  readonly maxPossibleScore: number;
+
   @ApiProperty({ example: 1 })
   readonly difficulty: number;
 
@@ -25,6 +28,7 @@ export class LevelDTO {
     board: BoardDTO,
     timeLimit: number,
     maxMoves: number,
+    maxPossibleScore: number,
     difficulty: number,
     order: number,
   ) {
@@ -32,6 +36,7 @@ export class LevelDTO {
     this.board = board;
     this.timeLimit = timeLimit;
     this.maxMoves = maxMoves;
+    this.maxPossibleScore = maxPossibleScore;
     this.difficulty = difficulty;
     this.order = order;
   }
