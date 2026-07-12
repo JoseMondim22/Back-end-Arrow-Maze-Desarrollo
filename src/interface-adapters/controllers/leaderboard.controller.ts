@@ -1,4 +1,5 @@
 import { Controller, Get, Headers, HttpCode, HttpStatus, Inject, Param, UseFilters } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetLeaderboardQuery } from '../../application/queries/get-leaderboard.query';
 import { LeaderboardEntryResult } from '../../application/results/leaderboard-entry.result';
 import { LeaderboardEntryDTO } from '../dtos/output/leaderboard-entry.dto';
@@ -13,6 +14,8 @@ import {
 
 const LEADERBOARD_TOP_ENTRIES = 20;
 
+@ApiTags('leaderboard')
+@ApiBearerAuth()
 @Controller('leaderboard')
 @UseFilters(DomainExceptionFilter)
 export class LeaderboardController {
@@ -28,6 +31,13 @@ export class LeaderboardController {
 
   @Get(':levelId')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get the top scores for a level' })
+  @ApiParam({ name: 'levelId', example: 'level-1' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Leaderboard retrieved successfully',
+    type: [LeaderboardEntryDTO],
+  })
   async getLeaderboard(
     @Param('levelId') levelId: string,
     @Headers('authorization') authorizationHeader?: string,

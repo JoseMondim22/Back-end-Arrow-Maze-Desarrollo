@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Post, UseFilters } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SyncProgressCommand } from '../../application/commands/sync-progress.command';
 import { SyncDTO } from '../dtos/input/sync.dto';
 import { extractBearerToken } from './bearer-token.helper';
@@ -10,6 +11,8 @@ import {
   SecureCommandServiceFactory,
 } from './tokens';
 
+@ApiTags('progress')
+@ApiBearerAuth()
 @Controller('progress')
 @UseFilters(DomainExceptionFilter)
 export class ProgressController {
@@ -22,6 +25,8 @@ export class ProgressController {
 
   @Post('sync')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Sync a level attempt score for the current user' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Progress synced successfully' })
   async sync(
     @Body() dto: SyncDTO,
     @Headers('authorization') authorizationHeader?: string,
