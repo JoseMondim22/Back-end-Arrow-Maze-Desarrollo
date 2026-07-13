@@ -42,6 +42,48 @@ Frameworks / Infrastructure → Interface Adapters → Application (Use Cases) �
 - **Infrastructure** cablea todo: el Composition Root **es** el sistema de módulos de NestJS
   (`src/infrastructure/modules/`), inicializado una sola vez desde `src/main.ts`.
 
+### Diagrama de capas
+
+Las flechas indican la única dirección permitida de dependencia (**Dependency Rule**): una capa
+más externa puede importar una más interna, nunca al revés. `Domain` no conoce ninguna otra capa.
+
+```mermaid
+flowchart TB
+    subgraph L4["Layer 4 — Frameworks &amp; Infrastructure"]
+        direction LR
+        Modules["NestJS Modules<br/>(Composition Root)"]
+        Concrete["Bcrypt / Jwt / TypeORM DataSource<br/>Console Logger / System Time"]
+    end
+
+    subgraph L3["Layer 3 — Interface Adapters"]
+        direction LR
+        Controllers["Controllers"]
+        Decorators["AOP Decorators<br/>(Logging*, Secure*)"]
+        Repos["TypeOrm*Repository"]
+        Mappers["Mappers"]
+        DTOs["DTOs"]
+    end
+
+    subgraph L2["Layer 2 — Application (Use Cases)"]
+        direction LR
+        UseCases["Use Cases<br/>(ICommandService / IQueryService)"]
+        Ports["Technical Ports<br/>(IIdGenerator, IPasswordHasher, ...)"]
+    end
+
+    subgraph L1["Layer 1 — Domain"]
+        direction LR
+        Aggregates["Aggregates<br/>User · Level · Progress"]
+        RepoPorts["Repository Ports<br/>(I*Repository)"]
+    end
+
+    L4 --> L3 --> L2 --> L1
+
+    style L1 fill:#2d6a4f,color:#fff
+    style L2 fill:#40916c,color:#fff
+    style L3 fill:#74c69d,color:#000
+    style L4 fill:#b7e4c7,color:#000
+```
+
 ### Agregados de dominio
 
 - **`User`** (root) — `UserId`, `Email`, `Password`, `Username`. Puerto: `IUserRepository`.
@@ -69,6 +111,78 @@ decoradores que envuelven el mismo puerto CQS que el caso de uso real:
 ```
 SecureXDecorator( LoggingXDecorator( UseCaseReal ) )
 ```
+
+#### Los 4 decoradores
+
+Hay un par por cada lado de CQS — uno para `ICommandService<TCommand>`, otro para
+`IQueryService<TQuery, TResult>` — porque un decorador solo puede envolver el puerto que
+implementa; mezclar ambos en una interfaz rompería CQS también en la capa de adapters.
+
+| Decorador | Envuelve | Qué hace |
+| --- | --- | --- |
+| `LoggingCommandDecorator<TCommand>` | `ICommandService<TCommand>` | Loguea inicio/fin/duración/error vía `runWithLogging` (helper compartido) |
+| `LoggingQueryDecorator<TQuery, TResult>` | `IQueryService<TQuery, TResult>` | Igual que el anterior, para el lado de lectura |
+| `SecureCommandDecorator<TCommand>` | `ICommandService<TCommand>` | Llama `currentUser.ensureAuthenticated()` antes de delegar — si el JWT es inválido/expiró, lanza `UnauthorizedError` sin ejecutar el caso de uso |
+| `SecureQueryDecorator<TQuery, TResult>` | `IQueryService<TQuery, TResult>` | Igual que el anterior, para queries |
+
+```ts
+// src/interface-adapters/decorators/command/secure-command.decorator.ts
+export class SecureCommandDecorator<TCommand> implements ICommandService<TCommand> {
+  constructor(
+    private readonly decoratee: ICommandService<TCommand>,
+    private readonly currentUser: CurrentUserProvider,
+  ) {}
+
+  async execute(command: TCommand): Promise<void> {
+    this.currentUser.ensureAuthenticated();
+    return this.decoratee.execute(command);
+  }
+}
+```
+
+`CurrentUserProvider` (`decorators/shared/current-user.provider.ts`) es **una instancia por
+request**: envuelve el JWT crudo y memoiza el resultado de `ITokenGenerator.verify()`, para que
+tanto el decorator (que solo necesita saber "¿está autenticado?") como el controller (que además
+necesita `getUserId()`) decodifiquen el token una sola vez.
+
+El wiring real (`src/infrastructure/modules/*.module.ts`) arma la cadena por `useFactory`:
+
+```ts
+// progress.module.ts
+useFactory: (levelRepo, progressRepo, idGen, logger, timeProvider) =>
+  (currentUser: CurrentUserProvider) =>
+    new SecureCommandDecorator(
+      new LoggingCommandDecorator(new SyncProgressUseCase(levelRepo, progressRepo, idGen), logger, timeProvider),
+      currentUser,
+    ),
+```
+
+`AuthController` es la única excepción: sus dos casos de uso (`register`, `login`) solo pasan
+por `LoggingXDecorator`, sin `SecureXDecorator`, porque son los únicos endpoints públicos —
+exigir un JWT para poder loguearse sería circular.
+
+#### Cómo esto aplica SOLID
+
+- **SRP (responsabilidad única).** El caso de uso real solo conoce su regla de negocio.
+  `LoggingCommandDecorator` solo sabe medir tiempo y loguear. `SecureCommandDecorator` solo sabe
+  verificar sesión. Cada clase cambia por una única razón.
+- **OCP (abierto/cerrado).** Agregar un aspecto nuevo (ej. caching, rate limiting) es crear un
+  decorador nuevo que implemente el mismo puerto — **cero** cambios en los casos de uso existentes
+  ni en los decoradores ya escritos.
+- **LSP (sustitución de Liskov).** `LoggingCommandDecorator<T>`, `SecureCommandDecorator<T>` y
+  `SyncProgressUseCase` son intercambiables en cualquier punto que espere un
+  `ICommandService<SyncProgressCommand>` — el controller nunca sabe si está llamando al caso de
+  uso real o a 2 decoradores anidados encima.
+- **ISP (segregación de interfaces).** `ICommandService`/`IQueryService` son puertos de **un solo
+  método** (`execute`). Un decorador no está obligado a implementar nada que no necesite.
+- **DIP (inversión de dependencias).** Los decoradores dependen de la abstracción CQS
+  (`ICommandService<TCommand>`), nunca de una clase concreta como `SyncProgressUseCase` —
+  por eso el mismo `LoggingCommandDecorator` sirve para los 4 comandos del proyecto sin
+  duplicar código.
+
+Esto también es el **patrón GoF Decorator** en su forma clásica: cada decorador implementa la
+misma interfaz que envuelve (`decoratee: ICommandService<TCommand>`) y delega en ella, agregando
+comportamiento antes/después sin herencia ni modificar la clase envuelta.
 
 ## Diagrama de clases
 
