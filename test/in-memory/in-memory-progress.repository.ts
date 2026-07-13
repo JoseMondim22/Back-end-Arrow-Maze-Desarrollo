@@ -22,6 +22,10 @@ export class InMemoryProgressRepository implements IProgressRepository {
       .slice(0, limit);
   }
 
+  async findAllByUser(userId: UserId): Promise<Progress[]> {
+    return this.allProgresses().filter((progress) => progress.getUserId().equals(userId));
+  }
+
   async save(progress: Progress): Promise<void> {
     this.savedProgresses.push(progress);
   }
