@@ -497,6 +497,176 @@ classDiagram
     LeaderboardController --> CurrentUserProvider
 ```
 
+## Principios SOLID
+
+Los 5 principios están aplicados en el código, no solo mencionados. Abajo, un ejemplo concreto
+por principio, tomado del proyecto (no un ejemplo genérico de libro). La aplicación de SOLID
+específica a los decoradores AOP ya está detallada en [Cómo esto aplica SOLID](#cómo-esto-aplica-solid) —
+esta sección cubre el resto del código: dominio, casos de uso y repositorios.
+
+### S — Single Responsibility Principle
+
+Cada clase cambia por una única razón. En el flujo de sincronizar progreso, tres clases separan
+tres responsabilidades distintas: **el caso de uso orquesta**, **el agregado protege su propio
+invariante**, y **el repositorio solo persiste** — ninguna sabe cómo hacer el trabajo de la otra.
+
+```ts
+// src/domain/progress/progress.aggregate.ts — SOLO protege el invariante bestScore
+registerAttempt(score: Score): void {
+  if (score.isHigherThan(this.bestScore)) {
+    this.bestScore = score;
+  }
+}
+```
+
+```ts
+// src/application/use-cases/sync-progress.use-case.ts — SOLO orquesta, no valida internals de Progress
+async execute(command: SyncProgressCommand): Promise<void> {
+  const level = await this.levelRepository.findById(levelId);
+  if (!level) throw new LevelNotFoundError(/* ... */);
+  if (!level.isScorePlausible(command.score)) throw new ImplausibleScoreError(/* ... */);
+
+  const existingProgress = await this.progressRepository.findByUserAndLevel(userId, levelId);
+  if (existingProgress) {
+    existingProgress.registerAttempt(score); // delega el invariante al agregado
+    await this.progressRepository.save(existingProgress);
+    return;
+  }
+  // ... crear Progress nuevo si no existía
+}
+```
+
+Si mañana cambia **cómo** se decide un mejor puntaje, se toca `Progress.registerAttempt` — nunca
+el caso de uso. Si cambia **de dónde** viene el nivel (otra DB, otra API), se toca
+`ILevelRepository`/su implementación — nunca el agregado.
+
+### O — Open/Closed Principle
+
+`CellType` es una interfaz mínima (`equals()`); cada tipo de celda es una clase separada que la
+implementa. Agregar un tipo de celda nuevo (ej. un power-up futuro) es **agregar una clase +
+un `case` en el factory** — cero cambios en `WallCell`, `EmptyCell`, `ExitCell` ni en el código
+que ya consume `CellType`.
+
+```ts
+// src/domain/level/interfaces/cell-type.ts
+export interface CellType {
+  equals(other: CellType): boolean;
+}
+
+// src/domain/level/value-objects/wall-cell.ts — una implementación, cerrada a modificación
+export class WallCell implements CellType {
+  private constructor() {}
+  static create(): WallCell { return new WallCell(); }
+  equals(other: CellType): boolean { return other instanceof WallCell; }
+}
+
+// src/domain/level/factories/cell.factory.ts — el único punto que conoce las subclases
+export class CellFactory {
+  static create(rawData: CellRawData): CellType {
+    switch (rawData.type) {
+      case 'grid_arrow': return GridArrowCell.create(GridDirection.create(rawData.direction ?? ''));
+      case 'wall': return WallCell.create();
+      case 'empty': return EmptyCell.create();
+      case 'exit': return ExitCell.create();
+      default: throw new UnknownCellTypeError(/* ... */);
+    }
+  }
+}
+```
+
+### L — Liskov Substitution Principle
+
+`IUserRepository` tiene dos implementaciones intercambiables: `TypeOrmUserRepository` (producción,
+habla con Postgres) e `InMemoryUserRepository` (tests, arrays en memoria). Cualquier caso de uso
+que dependa de `IUserRepository` — como `RegisterUserUseCase` o `LoginUseCase` — funciona
+idéntico sin importar cuál de las dos reciba, ni se entera de la diferencia.
+
+```ts
+// src/domain/user/i-user-repository.ts
+export interface IUserRepository {
+  findById(id: UserId): Promise<User | null>;
+  findByEmail(email: Email): Promise<User | null>;
+  save(user: User): Promise<void>;
+}
+
+// test/in-memory/in-memory-user.repository.ts — sustituye a TypeOrmUserRepository en tests
+export class InMemoryUserRepository implements IUserRepository {
+  private readonly seededUsers: User[] = [];
+  private readonly savedUsers: User[] = [];
+
+  async findById(id: UserId): Promise<User | null> {
+    return this.allUsers().find((user) => user.getId().equals(id)) ?? null;
+  }
+  async findByEmail(email: Email): Promise<User | null> {
+    return this.allUsers().find((user) => user.getEmail().equals(email)) ?? null;
+  }
+  async save(user: User): Promise<void> { this.savedUsers.push(user); }
+  private allUsers(): User[] { return [...this.seededUsers, ...this.savedUsers]; }
+}
+```
+
+Ningún `it()` de la suite de `RegisterUserUseCase` sabe que está corriendo contra un array en
+memoria en vez de Postgres — esa es precisamente la garantía que da LSP.
+
+### I — Interface Segregation Principle
+
+`ICommandService<TCommand>` e `IQueryService<TQuery, TResult>` son interfaces de **un solo
+método**. Ningún caso de uso ni decorador está forzado a implementar algo que no necesita (por
+ejemplo, un método `execute` que devuelva datos cuando en realidad es un comando que solo muta).
+Lo mismo aplica a los puertos de repositorio: `IUserRepository`, `ILevelRepository` e
+`IProgressRepository` son interfaces separadas y chicas, una por agregado — no un
+`IRepository` gigante con métodos de los tres dominios mezclados.
+
+```ts
+// src/application/ports/command-service.ts
+export interface ICommandService<TCommand> {
+  execute(command: TCommand): Promise<void>;
+}
+
+// src/application/ports/query-service.ts
+export interface IQueryService<TQuery, TResult> {
+  execute(query: TQuery): Promise<TResult>;
+}
+```
+
+### D — Dependency Inversion Principle
+
+`SyncProgressUseCase` (una clase de alto nivel, Capa 2) depende únicamente de abstracciones —
+`ILevelRepository`, `IProgressRepository`, `IIdGenerator` — nunca de `TypeOrmProgressRepository`
+ni de TypeORM. La implementación concreta se decide una sola vez, en el Composition Root
+(`progress.module.ts`), y se inyecta desde afuera.
+
+```ts
+// src/application/use-cases/sync-progress.use-case.ts — depende de interfaces, no de TypeORM
+export class SyncProgressUseCase implements ICommandService<SyncProgressCommand> {
+  constructor(
+    private readonly levelRepository: ILevelRepository,
+    private readonly progressRepository: IProgressRepository,
+    private readonly idGenerator: IIdGenerator,
+  ) {}
+  // ...
+}
+```
+
+```ts
+// src/infrastructure/modules/progress.module.ts — el Composition Root decide la implementación concreta
+useFactory: (levelRepository, progressRepository, idGenerator, logger, timeProvider) =>
+  (currentUser) =>
+    new SecureCommandDecorator(
+      new LoggingCommandDecorator(
+        new SyncProgressUseCase(levelRepository, progressRepository, idGenerator),
+        logger,
+        timeProvider,
+      ),
+      currentUser,
+    ),
+inject: [LEVEL_REPOSITORY, PROGRESS_REPOSITORY, ID_GENERATOR, LOGGER, TIME_PROVIDER],
+```
+
+`LEVEL_REPOSITORY`/`PROGRESS_REPOSITORY` son símbolos de NestJS que en `PersistenceModule` se
+bindean a `TypeOrmLevelRepository`/`TypeOrmProgressRepository` — el único lugar del proyecto que
+lo sabe.
+
 ## Reglas de dominio (invariantes)
 
 - `Board` valida: nodos no vacíos, **al menos una `ExitCell`**, edges referencian `NodeId`s
