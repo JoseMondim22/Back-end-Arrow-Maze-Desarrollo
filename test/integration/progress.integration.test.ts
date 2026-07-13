@@ -33,3 +33,29 @@ describe('POST /progress/sync', () => {
     api.thenResponseStatusShouldBe(401);
   });
 });
+
+describe('GET /progress', () => {
+  const api = new ProgressIntegrationTestAPI();
+
+  beforeAll(() => api.setup());
+  afterAll(() => api.teardown());
+
+  it('should_return_synced_progress_when_authenticated', async () => {
+    await api.givenAuthenticatedUser();
+    await api.givenExistingLevelWithMaxScore(100);
+    await api.whenSyncingProgress(80);
+
+    await api.whenGettingPlayerProgress();
+
+    api.thenResponseStatusShouldBe(200);
+    api.thenResponseShouldContainLevelWithScore(80);
+  });
+
+  it('should_reject_getting_player_progress_when_no_token_provided', async () => {
+    await api.givenAuthenticatedUser();
+
+    await api.whenGettingPlayerProgressWithoutAuth();
+
+    api.thenResponseStatusShouldBe(401);
+  });
+});
