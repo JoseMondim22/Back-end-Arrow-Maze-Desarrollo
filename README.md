@@ -184,6 +184,80 @@ Esto también es el **patrón GoF Decorator** en su forma clásica: cada decorad
 misma interfaz que envuelve (`decoratee: ICommandService<TCommand>`) y delega en ella, agregando
 comportamiento antes/después sin herencia ni modificar la clase envuelta.
 
+## Patrones de diseño (GoF)
+
+Solo se listan los patrones que están **realmente implementados en el código**, verificados leyendo
+el `src/` — no una lista aspiracional. Se buscó explícitamente `getInstance()`/`private static
+instance` en todo el proyecto para confirmar si existía Singleton como patrón propio: **no
+existe**. Que NestJS instancie sus providers como singleton es comportamiento del framework, no
+algo que el equipo haya implementado — por eso no está en esta lista.
+
+| Patrón | Categoría | Clase | Por qué |
+| --- | --- | --- | --- |
+| **Factory Method** | Creacional | `CellFactory.create()` | Decide qué subclase de `CellType` instanciar sin que el caller conozca las clases concretas |
+| **Adapter** | Estructural | `TypeOrmUserRepository`, `TypeOrmLevelRepository`, `TypeOrmProgressRepository` | Adaptan la API de `Repository<Entity>` de TypeORM a los puertos de dominio (`I*Repository`) |
+| **Decorator** | Estructural | `LoggingCommandDecorator`, `SecureCommandDecorator`, `LoggingQueryDecorator`, `SecureQueryDecorator` | Ya documentado en detalle arriba, en [AOP vía Decorator](#aop-vía-decorator) |
+
+### Factory Method — `CellFactory`
+
+Un tipo de celda (`grid_arrow`, `wall`, `empty`, `exit`) llega como dato crudo (`type: string`) y
+hay que instanciar la subclase de `CellType` correcta. El caller (`BoardMapper`, en Capa 3) nunca
+importa `WallCell`/`EmptyCell`/`ExitCell`/`GridArrowCell` directamente — solo conoce `CellFactory`
+y la interfaz `CellType` que devuelve.
+
+```ts
+// src/domain/level/factories/cell.factory.ts
+export class CellFactory {
+  static create(rawData: CellRawData): CellType {
+    switch (rawData.type) {
+      case 'grid_arrow':
+        return GridArrowCell.create(GridDirection.create(rawData.direction ?? ''));
+      case 'wall':
+        return WallCell.create();
+      case 'empty':
+        return EmptyCell.create();
+      case 'exit':
+        return ExitCell.create();
+      default:
+        throw new UnknownCellTypeError(`"${rawData.type}" is not a known cell type.`);
+    }
+  }
+}
+```
+
+### Adapter — `TypeOrm*Repository`
+
+El dominio define el puerto `IUserRepository` con su propio vocabulario (`User`, `UserId`,
+`Email`). TypeORM expone `Repository<UserEntity>`, con un vocabulario distinto (`findOneBy`,
+entidades anotadas). `TypeOrmUserRepository` es el adaptador entre los dos: implementa el puerto
+de dominio y por dentro traduce con `UserMapper` hacia/desde la API real de TypeORM.
+
+```ts
+// src/interface-adapters/repositories/typeorm-user.repository.ts
+export class TypeOrmUserRepository implements IUserRepository {
+  constructor(private readonly ormRepository: Repository<UserEntity>) {}
+
+  async findById(id: UserId): Promise<User | null> {
+    const entity = await this.ormRepository.findOneBy({ id: id.getValue() });
+    return entity ? UserMapper.toDomain(entity) : null;
+  }
+
+  async findByEmail(email: Email): Promise<User | null> {
+    const entity = await this.ormRepository.findOneBy({ email: email.getValue() });
+    return entity ? UserMapper.toDomain(entity) : null;
+  }
+
+  async save(user: User): Promise<void> {
+    const entity = UserMapper.toEntity(user);
+    await this.ormRepository.save(entity);
+  }
+}
+```
+
+El caso de uso que recibe `IUserRepository` (ej. `RegisterUserUseCase`) nunca sabe que del otro
+lado hay TypeORM — podría ser Mongo, un archivo JSON, o el `InMemoryUserRepository` de los tests
+(ver [L — Liskov Substitution Principle](#l--liskov-substitution-principle)).
+
 ## Diagrama de clases
 
 > Generado a partir del código fuente real (`src/`), no de una plantilla genérica.
