@@ -30,80 +30,289 @@ npm run typecheck        # tsc --noEmit
 npm test                 # unit + integración + contrato
 ```
 
-## Arquitectura — Clean Architecture (4 capas)
+## Diagrama de arquitectura
 
-```
-Frameworks / Infrastructure → Interface Adapters → Application (Use Cases) → Domain
-```
+Fuente editable: [`docs/DiagramaBackendCleanArchitecture_v2_drawio.xml`](docs/DiagramaBackendCleanArchitecture_v2_drawio.xml)
+(abrir con [draw.io / diagrams.net](https://app.diagrams.net/)). Las imágenes de abajo son
+renders exportados de ese mismo archivo, embebidos para que se vean directo en el README.
 
-- **Domain** no importa nada de las capas externas.
-- **Application** importa solo clases de dominio e interfaces de puerto.
-- **Interface Adapters** implementa los puertos y traduce entre capas (DTOs ↔ dominio ↔ entidades ORM).
-- **Infrastructure** cablea todo: el Composition Root **es** el sistema de módulos de NestJS
-  (`src/infrastructure/modules/`), inicializado una sola vez desde `src/main.ts`.
+### Vista completa — 4 capas
 
-### Diagrama de capas
+![Vista completa de las 4 capas](docs/img/diagram-full.png)
 
-Las flechas indican la única dirección permitida de dependencia (**Dependency Rule**): una capa
-más externa puede importar una más interna, nunca al revés. `Domain` no conoce ninguna otra capa.
+### Capa 1 — Domain · `Level`
 
-```mermaid
-flowchart TB
-    subgraph L4["Layer 4 — Frameworks &amp; Infrastructure"]
-        direction LR
-        Modules["NestJS Modules<br/>(Composition Root)"]
-        Concrete["Bcrypt / Jwt / TypeORM DataSource<br/>Console Logger / System Time"]
-    end
+![Domain · Level](docs/img/diagram-dlevel.png)
 
-    subgraph L3["Layer 3 — Interface Adapters"]
-        direction LR
-        Controllers["Controllers"]
-        Decorators["AOP Decorators<br/>(Logging*, Secure*)"]
-        Repos["TypeOrm*Repository"]
-        Mappers["Mappers"]
-        DTOs["DTOs"]
-    end
+### Capa 1 — Domain · `User` & `Progress`
 
-    subgraph L2["Layer 2 — Application (Use Cases)"]
-        direction LR
-        UseCases["Use Cases<br/>(ICommandService / IQueryService)"]
-        Ports["Technical Ports<br/>(IIdGenerator, IPasswordHasher, ...)"]
-    end
+![Domain · User y Progress](docs/img/diagram-duser.png)
 
-    subgraph L1["Layer 1 — Domain"]
-        direction LR
-        Aggregates["Aggregates<br/>User · Level · Progress"]
-        RepoPorts["Repository Ports<br/>(I*Repository)"]
-    end
+### Capa 2 — Application (CQS + Use Cases)
 
-    L4 --> L3 --> L2 --> L1
+![Application · CQS y Use Cases](docs/img/diagram-app.png)
 
-    style L1 fill:#2d6a4f,color:#fff
-    style L2 fill:#40916c,color:#fff
-    style L3 fill:#74c69d,color:#000
-    style L4 fill:#b7e4c7,color:#000
+### Capa 3 — Interface Adapters (AOP · Repos · Controllers)
+
+![Interface Adapters](docs/img/diagram-adp.png)
+
+### Capa 4 — Infrastructure (Composition Root)
+
+![Infrastructure · Composition Root](docs/img/diagram-infra.png)
+
+## Principios SOLID
+
+Los 5 principios están aplicados en el código, no solo mencionados. Abajo, un ejemplo concreto
+por principio, tomado del proyecto (no un ejemplo genérico de libro). La aplicación de SOLID
+específica a los decoradores AOP se detalla más abajo, en [Cómo esto aplica SOLID](#cómo-esto-aplica-solid) —
+esta sección cubre el resto del código: dominio, casos de uso y repositorios.
+
+### S — Single Responsibility Principle
+
+Cada clase cambia por una única razón. En el flujo de sincronizar progreso, tres clases separan
+tres responsabilidades distintas: **el caso de uso orquesta**, **el agregado protege su propio
+invariante**, y **el repositorio solo persiste** — ninguna sabe cómo hacer el trabajo de la otra.
+
+```ts
+// src/domain/progress/progress.aggregate.ts — SOLO protege el invariante bestScore
+registerAttempt(score: Score): void {
+  if (score.isHigherThan(this.bestScore)) {
+    this.bestScore = score;
+  }
+}
 ```
 
-### Agregados de dominio
+```ts
+// src/application/use-cases/sync-progress.use-case.ts — SOLO orquesta, no valida internals de Progress
+async execute(command: SyncProgressCommand): Promise<void> {
+  const level = await this.levelRepository.findById(levelId);
+  if (!level) throw new LevelNotFoundError(/* ... */);
+  if (!level.isScorePlausible(command.score)) throw new ImplausibleScoreError(/* ... */);
 
-- **`User`** (root) — `UserId`, `Email`, `Password`, `Username`. Puerto: `IUserRepository`.
-- **`Level`** (root) — `Board`, `LevelRules`, `LevelOrder`, `LevelId`. Puerto: `ILevelRepository`.
-  - `Board` es un **grafo**, no una matriz: `CellNode[]` + `Edge[]` + `Chain[]`.
-  - `CellType` es polimórfico: `GridArrowCell` (implementa `ArrowCell extends CellType`),
-    `WallCell`, `EmptyCell`, `ExitCell`.
-- **`Progress`** (root) — referencia `UserId`/`LevelId` **por id**, nunca por objeto.
-  Puerto: `IProgressRepository`.
+  const existingProgress = await this.progressRepository.findByUserAndLevel(userId, levelId);
+  if (existingProgress) {
+    existingProgress.registerAttempt(score); // delega el invariante al agregado
+    await this.progressRepository.save(existingProgress);
+    return;
+  }
+  // ... crear Progress nuevo si no existía
+}
+```
 
-### CQS (Command-Query Separation)
+Si mañana cambia **cómo** se decide un mejor puntaje, se toca `Progress.registerAttempt` — nunca
+el caso de uso. Si cambia **de dónde** viene el nivel (otra DB, otra API), se toca
+`ILevelRepository`/su implementación — nunca el agregado.
 
-Cada caso de uso implementa exactamente uno de estos dos puertos de método único:
+### O — Open/Closed Principle
+
+`CellType` es una interfaz mínima (`equals()`); cada tipo de celda es una clase separada que la
+implementa. Agregar un tipo de celda nuevo (ej. un power-up futuro) es **agregar una clase +
+un `case` en el factory** — cero cambios en `WallCell`, `EmptyCell`, `ExitCell` ni en el código
+que ya consume `CellType`.
+
+```ts
+// src/domain/level/interfaces/cell-type.ts
+export interface CellType {
+  equals(other: CellType): boolean;
+}
+
+// src/domain/level/value-objects/wall-cell.ts — una implementación, cerrada a modificación
+export class WallCell implements CellType {
+  private constructor() {}
+  static create(): WallCell { return new WallCell(); }
+  equals(other: CellType): boolean { return other instanceof WallCell; }
+}
+
+// src/domain/level/factories/cell.factory.ts — el único punto que conoce las subclases
+export class CellFactory {
+  static create(rawData: CellRawData): CellType {
+    switch (rawData.type) {
+      case 'grid_arrow': return GridArrowCell.create(GridDirection.create(rawData.direction ?? ''));
+      case 'wall': return WallCell.create();
+      case 'empty': return EmptyCell.create();
+      case 'exit': return ExitCell.create();
+      default: throw new UnknownCellTypeError(/* ... */);
+    }
+  }
+}
+```
+
+### L — Liskov Substitution Principle
+
+`IUserRepository` tiene dos implementaciones intercambiables: `TypeOrmUserRepository` (producción,
+habla con Postgres) e `InMemoryUserRepository` (tests, arrays en memoria). Cualquier caso de uso
+que dependa de `IUserRepository` — como `RegisterUserUseCase` o `LoginUseCase` — funciona
+idéntico sin importar cuál de las dos reciba, ni se entera de la diferencia.
+
+```ts
+// src/domain/user/i-user-repository.ts
+export interface IUserRepository {
+  findById(id: UserId): Promise<User | null>;
+  findByEmail(email: Email): Promise<User | null>;
+  save(user: User): Promise<void>;
+}
+
+// test/in-memory/in-memory-user.repository.ts — sustituye a TypeOrmUserRepository en tests
+export class InMemoryUserRepository implements IUserRepository {
+  private readonly seededUsers: User[] = [];
+  private readonly savedUsers: User[] = [];
+
+  async findById(id: UserId): Promise<User | null> {
+    return this.allUsers().find((user) => user.getId().equals(id)) ?? null;
+  }
+  async findByEmail(email: Email): Promise<User | null> {
+    return this.allUsers().find((user) => user.getEmail().equals(email)) ?? null;
+  }
+  async save(user: User): Promise<void> { this.savedUsers.push(user); }
+  private allUsers(): User[] { return [...this.seededUsers, ...this.savedUsers]; }
+}
+```
+
+Ningún `it()` de la suite de `RegisterUserUseCase` sabe que está corriendo contra un array en
+memoria en vez de Postgres — esa es precisamente la garantía que da LSP.
+
+### I — Interface Segregation Principle
+
+`ICommandService<TCommand>` e `IQueryService<TQuery, TResult>` son interfaces de **un solo
+método**. Ningún caso de uso ni decorador está forzado a implementar algo que no necesita (por
+ejemplo, un método `execute` que devuelva datos cuando en realidad es un comando que solo muta).
+Lo mismo aplica a los puertos de repositorio: `IUserRepository`, `ILevelRepository` e
+`IProgressRepository` son interfaces separadas y chicas, una por agregado — no un
+`IRepository` gigante con métodos de los tres dominios mezclados.
+
+```ts
+// src/application/ports/command-service.ts
+export interface ICommandService<TCommand> {
+  execute(command: TCommand): Promise<void>;
+}
+
+// src/application/ports/query-service.ts
+export interface IQueryService<TQuery, TResult> {
+  execute(query: TQuery): Promise<TResult>;
+}
+```
+
+### D — Dependency Inversion Principle
+
+`SyncProgressUseCase` (una clase de alto nivel, Capa 2) depende únicamente de abstracciones —
+`ILevelRepository`, `IProgressRepository`, `IIdGenerator` — nunca de `TypeOrmProgressRepository`
+ni de TypeORM. La implementación concreta se decide una sola vez, en el Composition Root
+(`progress.module.ts`), y se inyecta desde afuera.
+
+```ts
+// src/application/use-cases/sync-progress.use-case.ts — depende de interfaces, no de TypeORM
+export class SyncProgressUseCase implements ICommandService<SyncProgressCommand> {
+  constructor(
+    private readonly levelRepository: ILevelRepository,
+    private readonly progressRepository: IProgressRepository,
+    private readonly idGenerator: IIdGenerator,
+  ) {}
+  // ...
+}
+```
+
+```ts
+// src/infrastructure/modules/progress.module.ts — el Composition Root decide la implementación concreta
+useFactory: (levelRepository, progressRepository, idGenerator, logger, timeProvider) =>
+  (currentUser) =>
+    new SecureCommandDecorator(
+      new LoggingCommandDecorator(
+        new SyncProgressUseCase(levelRepository, progressRepository, idGenerator),
+        logger,
+        timeProvider,
+      ),
+      currentUser,
+    ),
+inject: [LEVEL_REPOSITORY, PROGRESS_REPOSITORY, ID_GENERATOR, LOGGER, TIME_PROVIDER],
+```
+
+`LEVEL_REPOSITORY`/`PROGRESS_REPOSITORY` son símbolos de NestJS que en `PersistenceModule` se
+bindean a `TypeOrmLevelRepository`/`TypeOrmProgressRepository` — el único lugar del proyecto que
+lo sabe.
+
+## Patrones de diseño (GoF)
+
+Solo se listan los patrones que están **realmente implementados en el código**, verificados leyendo
+el `src/` — no una lista aspiracional. Se buscó explícitamente `getInstance()`/`private static
+instance` en todo el proyecto para confirmar si existía Singleton como patrón propio: **no
+existe**. Que NestJS instancie sus providers como singleton es comportamiento del framework, no
+algo que el equipo haya implementado — por eso no está en esta lista.
+
+| Patrón | Categoría | Clase | Por qué |
+| --- | --- | --- | --- |
+| **Factory Method** | Creacional | `CellFactory.create()` | Decide qué subclase de `CellType` instanciar sin que el caller conozca las clases concretas |
+| **Adapter** | Estructural | `TypeOrmUserRepository`, `TypeOrmLevelRepository`, `TypeOrmProgressRepository` | Adaptan la API de `Repository<Entity>` de TypeORM a los puertos de dominio (`I*Repository`) |
+| **Decorator** | Estructural | `LoggingCommandDecorator`, `SecureCommandDecorator`, `LoggingQueryDecorator`, `SecureQueryDecorator` | Documentado en detalle más abajo, en [AOP vía Decorator](#aop-vía-decorator) |
+
+### Factory Method — `CellFactory`
+
+Un tipo de celda (`grid_arrow`, `wall`, `empty`, `exit`) llega como dato crudo (`type: string`) y
+hay que instanciar la subclase de `CellType` correcta. El caller (`BoardMapper`, en Capa 3) nunca
+importa `WallCell`/`EmptyCell`/`ExitCell`/`GridArrowCell` directamente — solo conoce `CellFactory`
+y la interfaz `CellType` que devuelve.
+
+```ts
+// src/domain/level/factories/cell.factory.ts
+export class CellFactory {
+  static create(rawData: CellRawData): CellType {
+    switch (rawData.type) {
+      case 'grid_arrow':
+        return GridArrowCell.create(GridDirection.create(rawData.direction ?? ''));
+      case 'wall':
+        return WallCell.create();
+      case 'empty':
+        return EmptyCell.create();
+      case 'exit':
+        return ExitCell.create();
+      default:
+        throw new UnknownCellTypeError(`"${rawData.type}" is not a known cell type.`);
+    }
+  }
+}
+```
+
+### Adapter — `TypeOrm*Repository`
+
+El dominio define el puerto `IUserRepository` con su propio vocabulario (`User`, `UserId`,
+`Email`). TypeORM expone `Repository<UserEntity>`, con un vocabulario distinto (`findOneBy`,
+entidades anotadas). `TypeOrmUserRepository` es el adaptador entre los dos: implementa el puerto
+de dominio y por dentro traduce con `UserMapper` hacia/desde la API real de TypeORM.
+
+```ts
+// src/interface-adapters/repositories/typeorm-user.repository.ts
+export class TypeOrmUserRepository implements IUserRepository {
+  constructor(private readonly ormRepository: Repository<UserEntity>) {}
+
+  async findById(id: UserId): Promise<User | null> {
+    const entity = await this.ormRepository.findOneBy({ id: id.getValue() });
+    return entity ? UserMapper.toDomain(entity) : null;
+  }
+
+  async findByEmail(email: Email): Promise<User | null> {
+    const entity = await this.ormRepository.findOneBy({ email: email.getValue() });
+    return entity ? UserMapper.toDomain(entity) : null;
+  }
+
+  async save(user: User): Promise<void> {
+    const entity = UserMapper.toEntity(user);
+    await this.ormRepository.save(entity);
+  }
+}
+```
+
+El caso de uso que recibe `IUserRepository` (ej. `RegisterUserUseCase`) nunca sabe que del otro
+lado hay TypeORM — podría ser Mongo, un archivo JSON, o el `InMemoryUserRepository` de los tests
+(ver [L — Liskov Substitution Principle](#l--liskov-substitution-principle)).
+
+## AOP vía Decorator
+
+**CQS (Command-Query Separation)** es la base sobre la que se apoya el AOP de este proyecto: cada
+caso de uso implementa exactamente uno de estos dos puertos de método único —
 
 ```ts
 interface ICommandService<TCommand> { execute(command: TCommand): Promise<void> }
 interface IQueryService<TQuery, TResult> { execute(query: TQuery): Promise<TResult> }
 ```
-
-### AOP vía Decorator
 
 En vez de una librería de AOP, los *cross-cutting concerns* (logging, autenticación) son
 decoradores que envuelven el mismo puerto CQS que el caso de uso real:
@@ -112,7 +321,7 @@ decoradores que envuelven el mismo puerto CQS que el caso de uso real:
 SecureXDecorator( LoggingXDecorator( UseCaseReal ) )
 ```
 
-#### Los 4 decoradores
+### Los 4 decoradores
 
 Hay un par por cada lado de CQS — uno para `ICommandService<TCommand>`, otro para
 `IQueryService<TQuery, TResult>` — porque un decorador solo puede envolver el puerto que
@@ -161,7 +370,7 @@ useFactory: (levelRepo, progressRepo, idGen, logger, timeProvider) =>
 por `LoggingXDecorator`, sin `SecureXDecorator`, porque son los únicos endpoints públicos —
 exigir un JWT para poder loguearse sería circular.
 
-#### Cómo esto aplica SOLID
+### Cómo esto aplica SOLID
 
 - **SRP (responsabilidad única).** El caso de uso real solo conoce su regla de negocio.
   `LoggingCommandDecorator` solo sabe medir tiempo y loguear. `SecureCommandDecorator` solo sabe
@@ -183,381 +392,3 @@ exigir un JWT para poder loguearse sería circular.
 Esto también es el **patrón GoF Decorator** en su forma clásica: cada decorador implementa la
 misma interfaz que envuelve (`decoratee: ICommandService<TCommand>`) y delega en ella, agregando
 comportamiento antes/después sin herencia ni modificar la clase envuelta.
-
-## Diagrama de clases
-
-> Generado a partir del código fuente real (`src/`), no de una plantilla genérica.
-> Renderiza en GitHub/GitLab de forma nativa (Mermaid).
-
-### Domain — `Level` (agregado principal)
-
-```mermaid
-classDiagram
-    class Level {
-        -LevelId id
-        -Board board
-        -LevelRules rules
-        -LevelOrder order
-        +create(...)$ Level
-        +reconstitute(...)$ Level
-        +isScorePlausible(score) boolean
-        +getId() LevelId
-        +getBoard() Board
-        +getRules() LevelRules
-        +getOrder() LevelOrder
-    }
-    class Board {
-        -CellNode[] nodes
-        -Edge[] edges
-        -Chain[] chains
-        +create(nodes, edges, chains)$ Board
-        +getNodes() CellNode[]
-        +getEdges() Edge[]
-        +getChains() Chain[]
-    }
-    class CellNode {
-        -NodeId id
-        -Position position
-        -CellType cellType
-        +create(id, position, cellType)$ CellNode
-    }
-    class Edge {
-        -NodeId from
-        -NodeId to
-        +create(from, to)$ Edge
-    }
-    class Chain {
-        -ChainId id
-        -NodeId[] nodeIds
-        +create(id, nodeIds)$ Chain
-    }
-    class LevelRules {
-        -number timeLimit
-        -number maxMoves
-        -number maxPossibleScore
-        -number difficulty
-        +create(...)$ LevelRules
-    }
-    class NodeId { -string value }
-    class ChainId { -string value }
-    class LevelId { -string value }
-    class LevelOrder { -number value }
-
-    class Position { <<interface>> +equals(other) boolean }
-    class Direction { <<interface>> +equals(other) boolean }
-    class CellType { <<interface>> +equals(other) boolean }
-    class ArrowCell { <<interface>> +getDirection() Direction }
-
-    class GridPosition {
-        -number row
-        -number column
-        +create(row, column)$ GridPosition
-    }
-    class GridDirection {
-        -string value
-        +create(value)$ GridDirection
-    }
-    class GridArrowCell {
-        -Direction direction
-        +create(direction)$ GridArrowCell
-        +getDirection() Direction
-    }
-    class WallCell { +create()$ WallCell }
-    class EmptyCell { +create()$ EmptyCell }
-    class ExitCell { +create()$ ExitCell }
-
-    class CellFactory {
-        <<factory>>
-        +create(rawData)$ CellType
-    }
-
-    class ILevelRepository {
-        <<interface>>
-        +findById(id) Level
-        +findAll() Level[]
-        +save(level) void
-    }
-
-    Level "1" *-- "1" Board
-    Level "1" *-- "1" LevelRules
-    Level "1" *-- "1" LevelOrder
-    Level "1" *-- "1" LevelId
-    Board "1" *-- "1..*" CellNode
-    Board "1" *-- "0..*" Edge
-    Board "1" *-- "0..*" Chain
-    CellNode --> NodeId
-    CellNode --> Position
-    CellNode --> CellType
-    Edge --> "2" NodeId
-    Chain "1" *-- "1..*" NodeId
-    Chain --> ChainId
-    GridPosition ..|> Position
-    GridDirection ..|> Direction
-    ArrowCell --|> CellType
-    GridArrowCell ..|> ArrowCell
-    WallCell ..|> CellType
-    EmptyCell ..|> CellType
-    ExitCell ..|> CellType
-    CellFactory ..> GridArrowCell : creates
-    CellFactory ..> WallCell : creates
-    CellFactory ..> EmptyCell : creates
-    CellFactory ..> ExitCell : creates
-    ILevelRepository ..> Level
-```
-
-### Domain — `User` y `Progress`
-
-```mermaid
-classDiagram
-    class User {
-        -UserId id
-        -Email email
-        -Password password
-        -Username username
-        +register(...)$ User
-        +reconstitute(...)$ User
-    }
-    class UserId { -string value }
-    class Email { -string value }
-    class Password {
-        -string hash
-        +ensureIsStrong(plainText)$ void
-        +fromHash(hash)$ Password
-    }
-    class Username { -string value }
-    class IUserRepository {
-        <<interface>>
-        +findById(id) User
-        +findByEmail(email) User
-        +save(user) void
-    }
-
-    class Progress {
-        -ProgressId id
-        -UserId userId
-        -LevelId levelId
-        -Score bestScore
-        +create(...)$ Progress
-        +registerAttempt(score) void
-    }
-    class ProgressId { -string value }
-    class Score {
-        -number value
-        +isHigherThan(other) boolean
-    }
-    class IProgressRepository {
-        <<interface>>
-        +findByUserAndLevel(userId, levelId) Progress
-        +findTopScoresByLevel(levelId, limit) Progress[]
-        +save(progress) void
-    }
-
-    User "1" *-- "1" UserId
-    User "1" *-- "1" Email
-    User "1" *-- "1" Password
-    User "1" *-- "1" Username
-    IUserRepository ..> User
-
-    Progress "1" *-- "1" ProgressId
-    Progress "1" *-- "1" Score
-    Progress --> UserId : references by id
-    Progress --> LevelId : references by id
-    IProgressRepository ..> Progress
-```
-
-### Application — CQS + Use Cases
-
-```mermaid
-classDiagram
-    class ICommandService~TCommand~ {
-        <<interface>>
-        +execute(command) Promise~void~
-    }
-    class IQueryService~TQuery,TResult~ {
-        <<interface>>
-        +execute(query) Promise~TResult~
-    }
-
-    class CreateLevelUseCase { +execute(CreateLevelCommand) Promise~void~ }
-    class RegisterUserUseCase { +execute(RegisterUserCommand) Promise~void~ }
-    class SyncProgressUseCase { +execute(SyncProgressCommand) Promise~void~ }
-    class GetLevelsUseCase { +execute(GetLevelsQuery) Promise~Level[]~ }
-    class GetLeaderboardUseCase { +execute(GetLeaderboardQuery) Promise~LeaderboardEntryResult[]~ }
-    class LoginUseCase { +execute(LoginQuery) Promise~LoginResult~ }
-
-    CreateLevelUseCase ..|> ICommandService~CreateLevelCommand~
-    RegisterUserUseCase ..|> ICommandService~RegisterUserCommand~
-    SyncProgressUseCase ..|> ICommandService~SyncProgressCommand~
-    GetLevelsUseCase ..|> IQueryService~GetLevelsQuery,Level[]~
-    GetLeaderboardUseCase ..|> IQueryService~GetLeaderboardQuery,LeaderboardEntryResult[]~
-    LoginUseCase ..|> IQueryService~LoginQuery,LoginResult~
-
-    CreateLevelUseCase --> ILevelRepository
-    CreateLevelUseCase --> IIdGenerator
-    RegisterUserUseCase --> IUserRepository
-    RegisterUserUseCase --> IIdGenerator
-    RegisterUserUseCase --> IPasswordHasher
-    SyncProgressUseCase --> ILevelRepository
-    SyncProgressUseCase --> IProgressRepository
-    SyncProgressUseCase --> IIdGenerator
-    GetLevelsUseCase --> ILevelRepository
-    GetLeaderboardUseCase --> IProgressRepository
-    GetLeaderboardUseCase --> IUserRepository
-    LoginUseCase --> IUserRepository
-    LoginUseCase --> IPasswordHasher
-    LoginUseCase --> ITokenGenerator
-
-    class IIdGenerator { <<interface>> +generate() string }
-    class IPasswordHasher {
-        <<interface>>
-        +hash(plainText) Promise~string~
-        +verify(plainText, hash) Promise~boolean~
-    }
-    class ITokenGenerator {
-        <<interface>>
-        +generate(userId) string
-        +verify(token) ITokenPayload
-    }
-    class ILogger { <<interface>> +log(message) void }
-    class ITimeProvider { <<interface>> +now() Date }
-```
-
-### Interface Adapters — AOP (Decorator) y Repositorios
-
-```mermaid
-classDiagram
-    class ICommandService~T~ { <<interface>> }
-    class IQueryService~T,R~ { <<interface>> }
-
-    class LoggingCommandDecorator~T~ {
-        -ICommandService~T~ decoratee
-        -ILogger logger
-        -ITimeProvider timeProvider
-        +execute(command) Promise~void~
-    }
-    class LoggingQueryDecorator~T,R~ {
-        -IQueryService~T,R~ decoratee
-        +execute(query) Promise~R~
-    }
-    class SecureCommandDecorator~T~ {
-        -ICommandService~T~ decoratee
-        -CurrentUserProvider currentUser
-        +execute(command) Promise~void~
-    }
-    class SecureQueryDecorator~T,R~ {
-        -IQueryService~T,R~ decoratee
-        -CurrentUserProvider currentUser
-        +execute(query) Promise~R~
-    }
-    class CurrentUserProvider {
-        -ITokenGenerator tokenGenerator
-        -string token
-        +ensureAuthenticated() void
-        +getUserId() string
-    }
-
-    LoggingCommandDecorator ..|> ICommandService~T~
-    LoggingCommandDecorator o-- ICommandService~T~ : decoratee
-    LoggingQueryDecorator ..|> IQueryService~T,R~
-    LoggingQueryDecorator o-- IQueryService~T,R~ : decoratee
-    SecureCommandDecorator ..|> ICommandService~T~
-    SecureCommandDecorator o-- ICommandService~T~ : decoratee
-    SecureCommandDecorator --> CurrentUserProvider
-    SecureQueryDecorator ..|> IQueryService~T,R~
-    SecureQueryDecorator o-- IQueryService~T,R~ : decoratee
-    SecureQueryDecorator --> CurrentUserProvider
-
-    class TypeOrmUserRepository { +findById(id) User +findByEmail(email) User +save(user) void }
-    class TypeOrmLevelRepository { +findById(id) Level +findAll() Level[] +save(level) void }
-    class TypeOrmProgressRepository { +findByUserAndLevel(...) Progress +findTopScoresByLevel(...) Progress[] +save(p) void }
-    class UserMapper { +toDomain(entity)$ User +toEntity(user)$ UserEntity }
-    class LevelMapper { +toDomain(entity)$ Level +toEntity(level)$ LevelEntity }
-    class ProgressMapper { +toDomain(entity)$ Progress +toEntity(p)$ ProgressEntity }
-    class BoardMapper { +toDomain(nodes, edges, chains)$ Board +toRaw(board)$ }
-
-    TypeOrmUserRepository ..|> IUserRepository
-    TypeOrmUserRepository --> UserMapper
-    TypeOrmLevelRepository ..|> ILevelRepository
-    TypeOrmLevelRepository --> LevelMapper
-    TypeOrmProgressRepository ..|> IProgressRepository
-    TypeOrmProgressRepository --> ProgressMapper
-    LevelMapper ..> BoardMapper
-    BoardMapper ..> CellFactory
-
-    class AuthController { +register(dto) Promise~void~ +login(dto) TokenDTO }
-    class LevelController { +getLevels(authHeader) LevelDTO[] +createLevel(dto, authHeader) Promise~void~ }
-    class ProgressController { +sync(dto, authHeader) Promise~void~ }
-    class LeaderboardController { +getLeaderboard(levelId, authHeader) LeaderboardEntryDTO[] }
-    class DomainExceptionFilter { +catch(error, host) void }
-
-    AuthController --> ICommandService~T~
-    AuthController --> IQueryService~T,R~
-    LevelController --> CurrentUserProvider
-    ProgressController --> CurrentUserProvider
-    LeaderboardController --> CurrentUserProvider
-```
-
-## Reglas de dominio (invariantes)
-
-- `Board` valida: nodos no vacíos, **al menos una `ExitCell`**, edges referencian `NodeId`s
-  válidos, cada `Chain` referencia nodos existentes, sin duplicados, con cabeza `grid_arrow`
-  y cuerpo `empty`.
-- `Progress.registerAttempt(score)` — `bestScore` es **monótono**: solo se actualiza si el
-  nuevo puntaje es mayor.
-- `Level.isScorePlausible(score)` — rechaza puntajes que excedan `maxPossibleScore`.
-- El backend **no interpreta** `row`/`column` ni `direction`: son datos para el cliente.
-
-## API Endpoints
-
-| Método | Path | Auth | Caso de uso |
-| --- | --- | --- | --- |
-| POST | `/auth/register` | público | `RegisterUserUseCase` |
-| POST | `/auth/login` | público | `LoginUseCase` |
-| GET | `/levels` | JWT | `GetLevelsUseCase` |
-| POST | `/levels` | JWT | `CreateLevelUseCase` |
-| POST | `/progress/sync` | JWT | `SyncProgressUseCase` |
-| GET | `/leaderboard/:levelId` | JWT | `GetLeaderboardUseCase` |
-
-## Estructura de carpetas
-
-```
-src/
-├─ domain/                # Capa 1 — sin dependencias externas
-│  ├─ user/                # User, VOs, IUserRepository
-│  ├─ level/                # Level, Board, CellNode, Edge, Chain, CellType*, ILevelRepository
-│  └─ progress/             # Progress, Score, IProgressRepository
-├─ application/            # Capa 2 — CQS
-│  ├─ ports/                 # ICommandService, IQueryService, IIdGenerator, ILogger, ...
-│  ├─ commands/ queries/ results/
-│  └─ use-cases/
-├─ interface-adapters/     # Capa 3
-│  ├─ controllers/           # Auth, Level, Progress, Leaderboard + DomainExceptionFilter
-│  ├─ decorators/             # AOP: Logging*, Secure*, CurrentUserProvider
-│  ├─ repositories/           # TypeOrm*Repository
-│  ├─ entities/                # UserEntity, LevelEntity, ProgressEntity (TypeORM)
-│  ├─ mappers/                 # domain <-> entity/raw DTO
-│  └─ dtos/                    # input / output
-└─ infrastructure/         # Capa 4 — Composition Root (NestJS Modules)
-   ├─ modules/                 # AppModule + un módulo por feature
-   ├─ auth/ shared/             # implementaciones concretas de los puertos técnicos
-   └─ tokens.ts                 # símbolos de inyección de dependencias
-```
-
-## Testing
-
-Arquitectura de tests de 3 niveles (Object Mother → Testing API → `it` block). Ver `CLAUDE.md`
-para la convención completa. Suites: unit (dominio + casos de uso), integración (HTTP +
-`sql.js` en memoria), contrato.
-
-```bash
-npm test
-```
-
-## Conventional Commits
-
-```
-feat(auth): add JWT authentication
-fix(level): validate exactly one exit cell in board
-test(progress): add unit tests for registerAttempt invariant
-refactor(domain): extract CellFactory to domain layer
-```
