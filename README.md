@@ -40,25 +40,7 @@ renders exportados de ese mismo archivo, embebidos para que se vean directo en e
 
 ![Vista completa de las 4 capas](docs/img/diagram-full.png)
 
-### Capa 1 — Domain · `Level`
 
-![Domain · Level](docs/img/diagram-dlevel.png)
-
-### Capa 1 — Domain · `User` & `Progress`
-
-![Domain · User y Progress](docs/img/diagram-duser.png)
-
-### Capa 2 — Application (CQS + Use Cases)
-
-![Application · CQS y Use Cases](docs/img/diagram-app.png)
-
-### Capa 3 — Interface Adapters (AOP · Repos · Controllers)
-
-![Interface Adapters](docs/img/diagram-adp.png)
-
-### Capa 4 — Infrastructure (Composition Root)
-
-![Infrastructure · Composition Root](docs/img/diagram-infra.png)
 
 ## Principios SOLID
 
