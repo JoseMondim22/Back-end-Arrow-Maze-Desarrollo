@@ -349,6 +349,7 @@ classDiagram
         <<interface>>
         +findByUserAndLevel(userId, levelId) Progress
         +findTopScoresByLevel(levelId, limit) Progress[]
+        +findAllByUser(userId) Progress[]
         +save(progress) void
     }
 
@@ -383,6 +384,7 @@ classDiagram
     class SyncProgressUseCase { +execute(SyncProgressCommand) Promise~void~ }
     class GetLevelsUseCase { +execute(GetLevelsQuery) Promise~Level[]~ }
     class GetLeaderboardUseCase { +execute(GetLeaderboardQuery) Promise~LeaderboardEntryResult[]~ }
+    class GetPlayerProgressUseCase { +execute(GetPlayerProgressQuery) Promise~Progress[]~ }
     class LoginUseCase { +execute(LoginQuery) Promise~LoginResult~ }
 
     CreateLevelUseCase ..|> ICommandService~CreateLevelCommand~
@@ -390,6 +392,7 @@ classDiagram
     SyncProgressUseCase ..|> ICommandService~SyncProgressCommand~
     GetLevelsUseCase ..|> IQueryService~GetLevelsQuery,Level[]~
     GetLeaderboardUseCase ..|> IQueryService~GetLeaderboardQuery,LeaderboardEntryResult[]~
+    GetPlayerProgressUseCase ..|> IQueryService~GetPlayerProgressQuery,Progress[]~
     LoginUseCase ..|> IQueryService~LoginQuery,LoginResult~
 
     CreateLevelUseCase --> ILevelRepository
@@ -403,6 +406,7 @@ classDiagram
     GetLevelsUseCase --> ILevelRepository
     GetLeaderboardUseCase --> IProgressRepository
     GetLeaderboardUseCase --> IUserRepository
+    GetPlayerProgressUseCase --> IProgressRepository
     LoginUseCase --> IUserRepository
     LoginUseCase --> IPasswordHasher
     LoginUseCase --> ITokenGenerator
@@ -469,7 +473,7 @@ classDiagram
 
     class TypeOrmUserRepository { +findById(id) User +findByEmail(email) User +save(user) void }
     class TypeOrmLevelRepository { +findById(id) Level +findAll() Level[] +save(level) void }
-    class TypeOrmProgressRepository { +findByUserAndLevel(...) Progress +findTopScoresByLevel(...) Progress[] +save(p) void }
+    class TypeOrmProgressRepository { +findByUserAndLevel(...) Progress +findTopScoresByLevel(...) Progress[] +findAllByUser(userId) Progress[] +save(p) void }
     class UserMapper { +toDomain(entity)$ User +toEntity(user)$ UserEntity }
     class LevelMapper { +toDomain(entity)$ Level +toEntity(level)$ LevelEntity }
     class ProgressMapper { +toDomain(entity)$ Progress +toEntity(p)$ ProgressEntity }
@@ -486,7 +490,7 @@ classDiagram
 
     class AuthController { +register(dto) Promise~void~ +login(dto) TokenDTO }
     class LevelController { +getLevels(authHeader) LevelDTO[] +createLevel(dto, authHeader) Promise~void~ }
-    class ProgressController { +sync(dto, authHeader) Promise~void~ }
+    class ProgressController { +getPlayerProgress(authHeader) PlayerProgressEntryDTO[] +sync(dto, authHeader) Promise~void~ }
     class LeaderboardController { +getLeaderboard(levelId, authHeader) LeaderboardEntryDTO[] }
     class DomainExceptionFilter { +catch(error, host) void }
 
@@ -516,6 +520,7 @@ classDiagram
 | GET | `/levels` | JWT | `GetLevelsUseCase` |
 | POST | `/levels` | JWT | `CreateLevelUseCase` |
 | POST | `/progress/sync` | JWT | `SyncProgressUseCase` |
+| GET | `/progress` | JWT | `GetPlayerProgressUseCase` |
 | GET | `/leaderboard/:levelId` | JWT | `GetLeaderboardUseCase` |
 
 ## Estructura de carpetas
