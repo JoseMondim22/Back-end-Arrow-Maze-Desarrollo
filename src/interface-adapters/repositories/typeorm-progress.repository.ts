@@ -26,6 +26,11 @@ export class TypeOrmProgressRepository implements IProgressRepository {
     return entities.map((entity) => ProgressMapper.toDomain(entity));
   }
 
+  async findAllByUser(userId: UserId): Promise<Progress[]> {
+    const entities = await this.ormRepository.find({ where: { userId: userId.getValue() } });
+    return entities.map((entity) => ProgressMapper.toDomain(entity));
+  }
+
   async save(progress: Progress): Promise<void> {
     const entity = ProgressMapper.toEntity(progress);
     await this.ormRepository.save(entity);

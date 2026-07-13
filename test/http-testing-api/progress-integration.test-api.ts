@@ -77,7 +77,25 @@ export class ProgressIntegrationTestAPI {
       .send(new SyncDTO(this.levelId, score));
   }
 
+  async whenGettingPlayerProgress(): Promise<void> {
+    this.lastResponse = await supertest(this.httpServer)
+      .get('/progress')
+      .set('Authorization', `Bearer ${this.accessToken}`);
+  }
+
+  async whenGettingPlayerProgressWithoutAuth(): Promise<void> {
+    this.lastResponse = await supertest(this.httpServer).get('/progress');
+  }
+
   thenResponseStatusShouldBe(status: number): void {
     expect(this.lastResponse.status).toBe(status);
+  }
+
+  thenResponseShouldContainLevelWithScore(score: number): void {
+    const entry = this.lastResponse.body.find(
+      (progress: { levelId: string; bestScore: number }) => progress.levelId === this.levelId,
+    );
+    expect(entry).toBeDefined();
+    expect(entry.bestScore).toBe(score);
   }
 }
