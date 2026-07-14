@@ -7,6 +7,7 @@ import {
   InvalidChainBodyError,
   InvalidChainHeadError,
   MissingExitCellError,
+  MixedPositionTypeError,
 } from '../errors';
 import { CellNode } from './cell-node';
 import { Chain } from './chain';
@@ -29,6 +30,12 @@ export class Board {
   static create(nodes: CellNode[], edges: Edge[], chains: Chain[]): Board {
     if (nodes.length === 0) {
       throw new EmptyBoardError('Board must contain at least one node.');
+    }
+
+    const positionCtor = nodes[0].getPosition().constructor;
+    const hasMixedPositionTypes = nodes.some((node) => node.getPosition().constructor !== positionCtor);
+    if (hasMixedPositionTypes) {
+      throw new MixedPositionTypeError('All nodes must use the same position type.');
     }
 
     const hasExit = nodes.some((node) => node.getCellType() instanceof ExitCell);
