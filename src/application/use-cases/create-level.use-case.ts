@@ -8,12 +8,12 @@ import { CellNode } from '../../domain/level/value-objects/cell-node';
 import { Chain } from '../../domain/level/value-objects/chain';
 import { ChainId } from '../../domain/level/value-objects/chain-id';
 import { Edge } from '../../domain/level/value-objects/edge';
-import { GridPosition } from '../../domain/level/value-objects/grid-position';
 import { LevelId } from '../../domain/level/value-objects/level-id';
 import { LevelOrder } from '../../domain/level/value-objects/level-order';
 import { LevelRules } from '../../domain/level/value-objects/level-rules';
 import { NodeId } from '../../domain/level/value-objects/node-id';
 import { CellFactory } from '../../domain/level/factories/cell.factory';
+import { PositionFactory } from '../../domain/level/factories/position.factory';
 
 export class CreateLevelUseCase implements ICommandService<CreateLevelCommand> {
   constructor(
@@ -25,8 +25,13 @@ export class CreateLevelUseCase implements ICommandService<CreateLevelCommand> {
     const nodes = command.nodes.map((node) =>
       CellNode.create(
         NodeId.create(node.id),
-        GridPosition.create(node.row, node.column),
-        CellFactory.create({ type: node.type, direction: node.direction }),
+        PositionFactory.create({
+          row: node.row,
+          column: node.column,
+          layer: node.layer,
+          positionType: node.positionType,
+        }),
+        CellFactory.create({ type: node.type, direction: node.direction, positionType: node.positionType }),
       ),
     );
 

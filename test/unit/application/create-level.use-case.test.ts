@@ -3,6 +3,7 @@ import {
   DanglingChainError,
   DanglingEdgeError,
   MissingExitCellError,
+  MixedPositionTypeError,
 } from '../../../src/domain/level/errors';
 import { CreateLevelTestAPI } from '../../testing-api/create-level.test-api';
 
@@ -96,6 +97,54 @@ describe('CreateLevelUseCase', () => {
 
     // Assert
     api.thenSavedLevelShouldHaveChainCount(1);
+  });
+
+  it('should_save_level_when_nodes_are_3d', async () => {
+    // Arrange
+    const api = new CreateLevelTestAPI();
+    const command = new CreateLevelCommand(
+      [
+        { id: '1', type: 'grid_arrow', row: 0, column: 0, layer: 0, positionType: 'grid3d', direction: 'forward' },
+        { id: '2', type: 'exit', row: 0, column: 1, layer: 0, positionType: 'grid3d' },
+      ],
+      [],
+      [],
+      60,
+      20,
+      100,
+      1,
+      1,
+    );
+
+    // Act
+    await api.whenCreatingLevel(command);
+
+    // Assert
+    api.thenSavedLevelShouldHaveNodeCount(2);
+  });
+
+  it('should_fail_when_nodes_mix_2d_and_3d_positions', async () => {
+    // Arrange
+    const api = new CreateLevelTestAPI();
+    const command = new CreateLevelCommand(
+      [
+        { id: '1', type: 'wall', row: 0, column: 0 },
+        { id: '2', type: 'exit', row: 0, column: 1, layer: 0, positionType: 'grid3d' },
+      ],
+      [],
+      [],
+      60,
+      20,
+      100,
+      1,
+      1,
+    );
+
+    // Act
+    await api.whenCreatingLevel(command);
+
+    // Assert
+    api.thenShouldFailWith(MixedPositionTypeError);
   });
 
   it('should_fail_when_chain_references_unknown_node', async () => {

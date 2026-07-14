@@ -4,7 +4,8 @@ import { WallCell } from '../../../../../src/domain/level/value-objects/wall-cel
 import { EmptyCell } from '../../../../../src/domain/level/value-objects/empty-cell';
 import { ExitCell } from '../../../../../src/domain/level/value-objects/exit-cell';
 import { GridDirection } from '../../../../../src/domain/level/value-objects/grid-direction';
-import { UnknownCellTypeError } from '../../../../../src/domain/level/errors';
+import { GridDirection3D } from '../../../../../src/domain/level/value-objects/grid-direction-3d';
+import { UnknownCellTypeError, UnknownPositionTypeError } from '../../../../../src/domain/level/errors';
 
 describe('CellFactory', () => {
   it('should_create_a_grid_arrow_cell_when_type_is_grid_arrow', () => {
@@ -14,6 +15,31 @@ describe('CellFactory', () => {
     // Assert
     expect(cell).toBeInstanceOf(GridArrowCell);
     expect((cell as GridArrowCell).getDirection().equals(GridDirection.create('up'))).toBe(true);
+  });
+
+  it('should_create_a_grid_arrow_cell_with_2d_direction_when_position_type_is_absent', () => {
+    // Arrange & Act
+    const cell = CellFactory.create({ type: 'grid_arrow', direction: 'up' });
+
+    // Assert
+    expect((cell as GridArrowCell).getDirection()).toBeInstanceOf(GridDirection);
+  });
+
+  it('should_create_a_grid_arrow_cell_with_3d_direction_when_position_type_is_grid3d', () => {
+    // Arrange & Act
+    const cell = CellFactory.create({ type: 'grid_arrow', direction: 'forward', positionType: 'grid3d' });
+
+    // Assert
+    expect(cell).toBeInstanceOf(GridArrowCell);
+    expect((cell as GridArrowCell).getDirection()).toBeInstanceOf(GridDirection3D);
+    expect((cell as GridArrowCell).getDirection().equals(GridDirection3D.create('forward'))).toBe(true);
+  });
+
+  it('should_throw_unknown_position_type_error_when_position_type_is_not_recognized', () => {
+    // Arrange & Act & Assert
+    expect(() => CellFactory.create({ type: 'grid_arrow', direction: 'up', positionType: 'circular' })).toThrow(
+      UnknownPositionTypeError,
+    );
   });
 
   it('should_create_a_wall_cell_when_type_is_wall', () => {
