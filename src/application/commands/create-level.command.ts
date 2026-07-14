@@ -4,6 +4,8 @@ export interface CreateLevelNodeInput {
   row: number;
   column: number;
   direction?: string;
+  layer?: number;
+  positionType?: string;
 }
 
 export interface CreateLevelEdgeInput {

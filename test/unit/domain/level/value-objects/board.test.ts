@@ -5,6 +5,7 @@ import { ChainId } from '../../../../../src/domain/level/value-objects/chain-id'
 import { Edge } from '../../../../../src/domain/level/value-objects/edge';
 import { NodeId } from '../../../../../src/domain/level/value-objects/node-id';
 import { GridPosition } from '../../../../../src/domain/level/value-objects/grid-position';
+import { GridPosition3D } from '../../../../../src/domain/level/value-objects/grid-position-3d';
 import { GridArrowCell } from '../../../../../src/domain/level/value-objects/grid-arrow-cell';
 import { GridDirection } from '../../../../../src/domain/level/value-objects/grid-direction';
 import { EmptyCell } from '../../../../../src/domain/level/value-objects/empty-cell';
@@ -20,10 +21,15 @@ import {
   InvalidChainBodyError,
   InvalidChainHeadError,
   MissingExitCellError,
+  MixedPositionTypeError,
 } from '../../../../../src/domain/level/errors';
 
 function buildNode(id: string, row: number, column: number, cellType: CellType) {
   return CellNode.create(NodeId.create(id), GridPosition.create(row, column), cellType);
+}
+
+function buildNode3D(id: string, row: number, column: number, layer: number, cellType: CellType) {
+  return CellNode.create(NodeId.create(id), GridPosition3D.create(row, column, layer), cellType);
 }
 
 function anArrowCell() {
@@ -70,6 +76,25 @@ describe('Board', () => {
 
     // Assert
     expect(board.getNodes()).toHaveLength(2);
+  });
+
+  it('should_create_when_all_nodes_are_3d', () => {
+    // Arrange
+    const nodes = [buildNode3D('1', 0, 0, 0, WallCell.create()), buildNode3D('2', 0, 1, 0, ExitCell.create())];
+
+    // Act
+    const board = Board.create(nodes, [], []);
+
+    // Assert
+    expect(board.getNodes()).toHaveLength(2);
+  });
+
+  it('should_fail_when_nodes_mix_position_types', () => {
+    // Arrange
+    const nodes = [buildNode('1', 0, 0, WallCell.create()), buildNode3D('2', 0, 1, 0, ExitCell.create())];
+
+    // Act & Assert
+    expect(() => Board.create(nodes, [], [])).toThrow(MixedPositionTypeError);
   });
 
   it('should_throw_dangling_edge_error_when_an_edge_references_an_unknown_node', () => {

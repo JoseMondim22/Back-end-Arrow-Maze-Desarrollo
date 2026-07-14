@@ -91,6 +91,7 @@ export class LevelIntegrationTestAPI {
       row: 'number',
       column: 'number',
       direction: 'string',
+      positionType: 'string',
     });
     assertShape(level.board.edges[0], { from: 'string', to: 'string' });
     assertShape(level.board.chains[0], { id: 'string', nodeIds: 'object' });

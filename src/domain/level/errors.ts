@@ -101,3 +101,15 @@ export class LevelNotFoundError extends DomainError {
     super(message);
   }
 }
+
+export class MixedPositionTypeError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class UnknownPositionTypeError extends DomainError {
+  constructor(message: string) {
+    super(message);
+  }
+}
