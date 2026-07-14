@@ -42,4 +42,9 @@ describe('PositionFactory', () => {
       UnknownPositionTypeError,
     );
   });
+
+  it('should_throw_invalid_grid_position_error_when_layer_is_provided_without_grid3d_position_type', () => {
+    // Arrange & Act & Assert
+    expect(() => PositionFactory.create({ row: 1, column: 2, layer: 0 })).toThrow(InvalidGridPositionError);
+  });
 });

@@ -14,6 +14,11 @@ export class PositionFactory {
   static create(raw: PositionRawData): Position {
     switch (raw.positionType ?? 'grid') {
       case 'grid':
+        if (raw.layer !== undefined) {
+          throw new InvalidGridPositionError(
+            'layer was provided but positionType is "grid". Did you mean to set positionType to "grid3d"?',
+          );
+        }
         return GridPosition.create(raw.row, raw.column);
       case 'grid3d':
         if (raw.layer === undefined) {
